@@ -20,7 +20,57 @@ from jsonschema import validate
 User = get_user_model()
 
 
-class Notification(models.Model):
+class BaseModel(models.Model):
+    """Base class for all other models."""
+
+    # Unique identifier.
+    uid = models.UUIDField(
+        default=uuid.uuid4,
+        editable=False,
+        db_index=True,
+        unique=True,
+        help_text="Unique identifier for this model instance.",
+    )
+    # Timestamp indicating when the instance was created.
+    created_at = models.DateTimeField(
+        auto_now_add=True,
+        help_text="Timestamp indicating when the instance was created.",
+    )
+    # Timestamp indicating when the instance was last updated.
+    updated_at = models.DateTimeField(
+        auto_now=True,
+        help_text="Timestamp indicating when the instance was last updated.",
+    )
+
+    class Meta:
+        abstract = True
+
+
+class CustomNotificationField(models.Model):
+    class Meta:
+        abstract = True
+
+    @classmethod
+    def extend_notification_model(cls, notification_model):
+        """
+        Extend the notification model with custom fields.
+
+        Args:
+            notification_model (django.db.models.Model): The notification model to extend.
+
+        Notes:
+            This method dynamically adds custom fields from the CustomNotificationField
+            class to the provided notification_model.
+        """
+        # Get all fields from the custom field class
+        custom_fields = cls._meta.fields
+
+        # Add each custom field to the Notification model
+        for field in custom_fields:
+            field.contribute_to_class(notification_model, field.name)
+
+
+class Notification(BaseModel):
     # The user associated with this notification.
     user = models.ForeignKey(
         User,
@@ -28,14 +78,6 @@ class Notification(models.Model):
         db_index=True,
         related_name="user_notification",
         help_text="The user to whom this notification belongs.",
-    )
-    # Unique identifier for the notification.
-    uid = models.UUIDField(
-        default=uuid.uuid4,
-        editable=False,
-        db_index=True,
-        unique=True,
-        help_text="Unique identifier for this notification.",
     )
     # JSON field to store the notification data.
     notification = models.JSONField(help_text="Notification data in JSON format.")
@@ -60,16 +102,6 @@ class Notification(models.Model):
         db_index=True,
         default=NotificationsStatus.ACTIVE,
         help_text="Status of the notification.",
-    )
-    # Timestamp indicating when the notification was created.
-    created_at = models.DateTimeField(
-        auto_now_add=True,
-        help_text="Timestamp indicating when the notification was created.",
-    )
-    # Timestamp indicating when the notification was last updated.
-    updated_at = models.DateTimeField(
-        auto_now=True,
-        help_text="Timestamp indicating when the notification was last updated.",
     )
 
     class Meta:
@@ -199,15 +231,7 @@ class Notification(models.Model):
         }
 
 
-class NotificationSettings(models.Model):
-    # Unique identifier for the notification.
-    uid = models.UUIDField(
-        default=uuid.uuid4,
-        editable=False,
-        db_index=True,
-        unique=True,
-        help_text="Unique identifier for this notification.",
-    )
+class NotificationSettings(BaseModel):
     user = models.OneToOneField(
         User,
         on_delete=models.CASCADE,
@@ -216,16 +240,6 @@ class NotificationSettings(models.Model):
     )
     is_enable_notification = models.BooleanField(
         default=True, verbose_name="Enable Notifications"
-    )
-    # Timestamp indicating when the notification was created.
-    created_at = models.DateTimeField(
-        auto_now_add=True,
-        help_text="Timestamp indicating when the notification settings was created.",
-    )
-    # Timestamp indicating when the notification was last updated.
-    updated_at = models.DateTimeField(
-        auto_now=True,
-        help_text="Timestamp indicating when the notification settings was last updated.",
     )
 
     class Meta:
@@ -243,3 +257,7 @@ class NotificationSettings(models.Model):
 
     def is_user_enable_notification(self):
         return self.objects.get(user=get_current_authenticated_user())
+
+
+# Automatically extend Notification model with custom fields
+CustomNotificationField.extend_notification_model(Notification)
