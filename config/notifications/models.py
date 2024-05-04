@@ -135,22 +135,38 @@ class Notification(BaseModel):
         Returns:
             QuerySet: A queryset of active notifications.
         """
-        return self.objects.filter(status=NotificationsStatus.ACTIVE).order_by("-pk")
+        return self.__class__.objects.filter(
+            status=NotificationsStatus.ACTIVE
+        ).order_by("-pk")
 
     def get_current_user_notifications(self):
         """
         Retrieve notifications for the current user if notifications are enabled.
 
         Returns:
-            QuerySet: A queryset of notifications belonging to the current user.
+            QuerySet: A queryset of notifications, total, read and unread notifications count belonging to the current user.
 
         Raises:
             ValueError: If notifications are not enabled for the current user.
         """
+
         if NotificationSettings().is_user_enable_notification():
-            return self.get_active_notifications().filter(
-                user=get_current_authenticated_user()
+            user_notifications = (
+                Notification()
+                .get_active_notifications()
+                .filter(user=get_current_authenticated_user())
+                .select_related("user", "created_by")
             )
+            return {
+                "notifications": user_notifications,
+                "total_notifications": int(user_notifications.count()),
+                "read_notifications": int(
+                    user_notifications.filter(is_read=True).count()
+                ),
+                "unread_notifications": int(
+                    user_notifications.filter(is_read=False).count()
+                ),
+            }
         else:
             raise ValueError("Notifications are not enabled for the current user.")
 
@@ -161,7 +177,24 @@ class Notification(BaseModel):
         Returns:
             QuerySet: A queryset of unread notifications of current user.
         """
-        return self.get_current_user_notifications().filter(is_read=False)
+        return (
+            Notification()
+            .get_current_user_notifications()["notifications"]
+            .filter(is_read=False)
+        )
+
+    def get_current_user_read_notifications(self):
+        """
+        Retrieve read notifications of current user.
+
+        Returns:
+            QuerySet: A queryset of read notifications of current user.
+        """
+        return (
+            Notification()
+            .get_current_user_notifications()["notifications"]
+            .filter(is_read=True)
+        )
 
     @classmethod
     def create_notifications(cls, notification, *users, **kwargs):
@@ -256,7 +289,9 @@ class NotificationSettings(BaseModel):
         return f"{self.user.username} - Notifications Enabled: {self.is_enable_notification}"
 
     def is_user_enable_notification(self):
-        return self.objects.get(user=get_current_authenticated_user())
+        return self.__class__.objects.get(
+            user=get_current_authenticated_user()
+        ).is_enable_notification
 
 
 # Automatically extend Notification model with custom fields
