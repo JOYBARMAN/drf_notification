@@ -9,6 +9,7 @@ from notifications.serializers import (
     UserNotificationListWithCountSerializer,
     NotificationSerializer,
 )
+from notifications.paginations import CustomPagination
 
 
 class UserNotificationList(generics.RetrieveAPIView):
@@ -16,23 +17,34 @@ class UserNotificationList(generics.RetrieveAPIView):
 
     permission_classes = [IsAuthenticated]
     serializer_class = UserNotificationListWithCountSerializer
+    pagination_class = CustomPagination
 
     def get_object(self):
         try:
             queryset = Notification().get_current_user_notifications()
+            notifications = queryset["notifications"].all()
 
             # Apply filter for is_read or unread notifications
             query_params = self.request.query_params.get("is_read")
-            acceptable_value = {
-                "true":True,
-                "false":False
-            }
+            acceptable_value = {"true": True, "false": False}
             if query_params:
                 query_params = acceptable_value.get(query_params.lower())
 
-            # If valid query params then filter
+            # If valid query params found then filter
             if isinstance(query_params, bool):
-                queryset["notifications"]= queryset["notifications"].filter(is_read=query_params)
+                notifications = notifications.filter(is_read=query_params)
+
+            # Paginate the notifications list
+            paginator = CustomPagination()
+            paginated_notifications = paginator.paginate_queryset(
+                notifications, self.request
+            )
+
+            # Add pagination data to the response
+            paginated_response = paginator.get_paginated_response(
+                paginated_notifications
+            )
+            queryset["notifications"] = paginated_response.data["results"]
 
             return queryset
 
