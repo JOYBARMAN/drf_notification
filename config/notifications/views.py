@@ -24,7 +24,7 @@ class UserNotificationList(generics.ListAPIView):
             raise ValidationError({"detail": str(e)})
 
 
-class UserNotificationDetail(generics.RetrieveAPIView):
+class UserNotificationDetail(generics.RetrieveUpdateAPIView):
     """Views for user notification list"""
 
     permission_classes = [IsAuthenticated]

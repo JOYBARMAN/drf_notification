@@ -261,7 +261,7 @@ class Notification(BaseModel):
 
         return {
             "created_notifications": created_notifications,
-            "missing_user": user.filter(id__in=missing_user_ids),
+            "missing_user": users.filter(id__in=missing_user_ids),
         }
 
 
@@ -290,9 +290,12 @@ class NotificationSettings(BaseModel):
         return f"{self.user.username} - Notifications Enabled: {self.is_enable_notification}"
 
     def is_user_enable_notification(self):
-        return self.__class__.objects.get(
-            user=get_current_authenticated_user()
-        ).is_enable_notification
+        try:
+            return self.__class__.objects.get(
+                user=get_current_authenticated_user()
+            ).is_enable_notification
+        except self.__class__.DoesNotExist:
+            raise ValueError("Notification settings instance missing for this user")
 
 
 # Automatically extend Notification model with custom fields
