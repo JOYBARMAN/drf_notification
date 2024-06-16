@@ -25,8 +25,8 @@ class UserSerializer(serializers.ModelSerializer):
 class NotificationSerializer(serializers.ModelSerializer):
     """Serializer for notification"""
 
-    user = UserSerializer()
-    created_by = UserSerializer()
+    user = UserSerializer(read_only=True)
+    created_by = UserSerializer(read_only=True)
 
     class Meta:
         model = Notification
@@ -41,7 +41,8 @@ class NotificationSerializer(serializers.ModelSerializer):
             "created_at",
             "updated_at",
         ]
-        read_only_fields = fields
+        read_only_fields = fields.copy()
+        read_only_fields.remove("status")
 
 
 class UserNotificationListWithCountSerializer(serializers.Serializer):
