@@ -11,15 +11,31 @@ from notifications.serializers import (
 )
 
 
-class UserNotificationList(generics.ListAPIView):
+class UserNotificationList(generics.RetrieveAPIView):
     """Views for user notification list"""
 
     permission_classes = [IsAuthenticated]
     serializer_class = UserNotificationListWithCountSerializer
 
-    def get_queryset(self):
+    def get_object(self):
         try:
-            return [Notification().get_current_user_notifications()]
+            queryset = Notification().get_current_user_notifications()
+
+            # Apply filter for is_read or unread notifications
+            query_params = self.request.query_params.get("is_read")
+            acceptable_value = {
+                "true":True,
+                "false":False
+            }
+            if query_params:
+                query_params = acceptable_value.get(query_params.lower())
+
+            # If valid query params then filter
+            if isinstance(query_params, bool):
+                queryset["notifications"]= queryset["notifications"].filter(is_read=query_params)
+
+            return queryset
+
         except ValueError as e:
             raise ValidationError({"detail": str(e)})
 
