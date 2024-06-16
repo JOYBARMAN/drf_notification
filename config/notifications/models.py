@@ -15,12 +15,13 @@ from django.db.models.query import QuerySet
 from notifications.choices import NotificationsStatus
 from notifications.schema_validations import NOTIFICATION_SCHEMA
 
+from dirtyfields import DirtyFieldsMixin
 from jsonschema import validate
 
 User = get_user_model()
 
 
-class BaseModel(models.Model):
+class BaseModel(DirtyFieldsMixin, models.Model):
     """Base class for all other models."""
 
     # Unique identifier.

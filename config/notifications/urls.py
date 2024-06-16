@@ -2,8 +2,9 @@
 
 from django.urls import path
 
-from notifications.views import UserNotificationList
+from notifications import views
 
 urlpatterns = [
-    path("user", UserNotificationList.as_view(), name="user-notification-list"),
+    path("", views.UserNotificationList.as_view(), name="user-notification-list"),
+    path("/<uuid:uid>", views.UserNotificationDetail.as_view(), name="user-notification-detail"),
 ]
