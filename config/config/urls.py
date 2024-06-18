@@ -22,3 +22,4 @@ urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/v1/me/notifications", include("notifications.urls")),
 ]
+urlpatterns += [path('silk/', include('silk.urls', namespace='silk'))]

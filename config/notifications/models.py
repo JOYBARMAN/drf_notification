@@ -11,6 +11,7 @@ from django_currentuser.middleware import (
 )
 from django.core.exceptions import ValidationError
 from django.db.models.query import QuerySet
+from django.db.models import Count, When, Case
 
 from notifications.choices import NotificationsStatus
 from notifications.schema_validations import NOTIFICATION_SCHEMA
@@ -158,16 +159,20 @@ class Notification(BaseModel):
                 .filter(user=get_current_authenticated_user())
                 .select_related("user", "created_by")
             )
+            # Aggregate the counts
+            notification_counts = user_notifications.aggregate(
+                total_notifications=Count("id"),
+                read_notifications=Count(Case(When(is_read=True, then=1))),
+            )
+
             return {
                 "notifications": user_notifications,
-                "total_notifications": int(user_notifications.count()),
-                "read_notifications": int(
-                    user_notifications.filter(is_read=True).count()
-                ),
-                "unread_notifications": int(
-                    user_notifications.filter(is_read=False).count()
-                ),
+                "total_notifications": notification_counts["total_notifications"],
+                "read_notifications": notification_counts["read_notifications"],
+                "unread_notifications": notification_counts["total_notifications"]
+                - notification_counts["read_notifications"],
             }
+
         else:
             raise ValueError("Notifications are not enabled for the current user.")
 
@@ -198,20 +203,20 @@ class Notification(BaseModel):
         )
 
     @classmethod
-    def create_notifications(cls, notification, *users, **kwargs):
+    def create_notifications(cls, notification, users, **kwargs):
         """
         Create notifications for multiple users efficiently.
 
         Args:
             notification (dict): Dictionary containing notification details.
-            *users (list or QuerySet): Users for whom notifications will be created.
+            users (list, QuerySet, or User): Users for whom notifications will be created.
             **kwargs: Additional keyword arguments to be passed to the Notification model.
 
         Returns:
             dict: A dictionary containing created notifications and missing users.
 
         Raises:
-            ValueError: If users parameter is not a list or QuerySet.
+            ValueError: If users parameter is not a list, QuerySet, or User.
             ValueError: If notification object does not contain required keys.
 
         Note:
@@ -220,10 +225,14 @@ class Notification(BaseModel):
             It then creates notifications for each user found in the database, using bulk_create
             to insert them in a single query. It returns a dictionary containing the created
             notifications and any missing users not found in the database.
-
         """
+
+        # Check if users is a single User object and convert it to a list
+        if isinstance(users, User):
+            users = [users]
+
         if not isinstance(users, (list, QuerySet)):
-            raise ValueError("Users must be a list or QuerySet")
+            raise ValueError("Users must be a list, QuerySet, or a User object")
 
         # Check if notification contains required keys
         required_keys = ["message", "object"]
@@ -234,21 +243,27 @@ class Notification(BaseModel):
                 )
             )
 
-        # Convert *users arguments into a single queryset
-        user_ids = [user.id for user in users]
-        user_queryset = User.objects.filter(id__in=user_ids)
+        # Convert list of users to QuerySet if necessary
+        if isinstance(users, list):
+            user_ids = [user.id for user in users]
+            user_queryset = User.objects.filter(id__in=user_ids)
+        else:
+            user_queryset = users
 
         # Get IDs of users found in the database
         found_user_ids = set(user_queryset.values_list("id", flat=True))
 
         # Find missing user IDs
-        missing_user_ids = set(user_ids) - found_user_ids
+        if isinstance(users, list):
+            all_user_ids = {user.id for user in users}
+        else:
+            all_user_ids = set(users.values_list("id", flat=True))
 
-        found_user = user_queryset.filter(id__in=found_user_ids)
+        missing_user_ids = all_user_ids - found_user_ids
 
         # Create a list of Notification objects for each user
         notifications_to_create = []
-        for user in found_user:
+        for user in user_queryset:
             notifications_to_create.append(
                 Notification(user=user, notification=notification, **kwargs)
             )
@@ -261,7 +276,7 @@ class Notification(BaseModel):
 
         return {
             "created_notifications": created_notifications,
-            "missing_user": users.filter(id__in=missing_user_ids),
+            "missing_users": User.objects.filter(id__in=missing_user_ids),
         }
 
 
