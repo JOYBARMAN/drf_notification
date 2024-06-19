@@ -12,7 +12,7 @@ from notifications.serializers import (
 from notifications.paginations import CustomPagination
 
 
-class UserNotificationList(generics.RetrieveAPIView):
+class UserNotificationList(generics.RetrieveUpdateAPIView):
     """Views for user notification list"""
 
     permission_classes = [IsAuthenticated]
