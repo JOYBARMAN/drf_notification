@@ -5,6 +5,7 @@ from django.contrib.auth import get_user_model
 from rest_framework import serializers
 
 from notifications.models import Notification
+from notifications.choices import NotificationsStatus, NotificationsActionChoices
 
 User = get_user_model()
 
@@ -49,7 +50,45 @@ class NotificationSerializer(serializers.ModelSerializer):
 class UserNotificationListWithCountSerializer(serializers.Serializer):
     """Serializer for user notification with count instance"""
 
-    total_notifications = serializers.IntegerField(min_value=0)
-    read_notifications = serializers.IntegerField(min_value=0)
-    unread_notifications = serializers.IntegerField(min_value=0)
-    notifications = NotificationSerializer(many=True)
+    total_notifications = serializers.IntegerField(min_value=0, read_only=True)
+    read_notifications = serializers.IntegerField(min_value=0, read_only=True)
+    unread_notifications = serializers.IntegerField(min_value=0, read_only=True)
+    notifications = NotificationSerializer(many=True, read_only=True)
+    action_choice = serializers.ChoiceField(
+        choices=NotificationsActionChoices.choices,
+        default=NotificationsActionChoices.UNDEFINED,
+        write_only=True,
+    )
+    notification_uids = serializers.ListField(
+        child=serializers.UUIDField(), write_only=True, allow_null=True, required=False
+    )
+
+    def update(self, instance, validated_data):
+        action_choice = validated_data.get("action_choice")
+        notifications = instance["notifications"]
+        notification_uids = validated_data.get("notification_uids", [])
+
+        # Mark all as read
+        if action_choice == NotificationsActionChoices.MARK_ALL_AS_READ:
+            # Update all notifications as read
+            Notification.objects.filter(
+                id__in=[notification.id for notification in notifications]
+            ).update(is_read=True)
+
+        # Mark as read
+        elif action_choice == NotificationsActionChoices.MARK_AS_READ:
+            if not notification_uids:
+                raise serializers.ValidationError(
+                    {"notification_uids": "Notification uids are required"}
+                )
+            # Update selected notifications as read
+            Notification.objects.filter(uid__in=notification_uids).update(is_read=True)
+
+        # Remove all notifications
+        elif action_choice == NotificationsActionChoices.REMOVE_ALL:
+            # Remove all notifications
+            Notification.objects.filter(
+                id__in=[notification.id for notification in notifications]
+            ).update(status=NotificationsStatus.REMOVED)
+
+        return validated_data
