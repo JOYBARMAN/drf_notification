@@ -63,6 +63,24 @@ class UserNotificationListWithCountSerializer(serializers.Serializer):
         child=serializers.UUIDField(), write_only=True, allow_null=True, required=False
     )
 
+    def validate(self, attrs):
+        action_choice = attrs.get("action_choice")
+        notification_uids = attrs.get("notification_uids", [])
+
+        if (
+            action_choice
+            in [
+                NotificationsActionChoices.MARK_AS_READ,
+                NotificationsActionChoices.MARK_AS_REMOVED,
+            ]
+            and not notification_uids
+        ):
+            raise serializers.ValidationError(
+                {"notification_uids": "Notification uids are required"}
+            )
+
+        return attrs
+
     def update(self, instance, validated_data):
         action_choice = validated_data.get("action_choice")
         notifications = instance["notifications"]
@@ -75,20 +93,23 @@ class UserNotificationListWithCountSerializer(serializers.Serializer):
                 id__in=[notification.id for notification in notifications]
             ).update(is_read=True)
 
-        # Mark as read
+        # Mark as read all selected notifications
         elif action_choice == NotificationsActionChoices.MARK_AS_READ:
-            if not notification_uids:
-                raise serializers.ValidationError(
-                    {"notification_uids": "Notification uids are required"}
-                )
             # Update selected notifications as read
             Notification.objects.filter(uid__in=notification_uids).update(is_read=True)
 
-        # Remove all notifications
-        elif action_choice == NotificationsActionChoices.REMOVE_ALL:
+        # Removed all notifications
+        elif action_choice == NotificationsActionChoices.REMOVED_ALL:
             # Remove all notifications
             Notification.objects.filter(
                 id__in=[notification.id for notification in notifications]
             ).update(status=NotificationsStatus.REMOVED)
+
+        # Mark as removed all selected notifications
+        elif action_choice == NotificationsActionChoices.MARK_AS_REMOVED:
+            # Remove selected notifications
+            Notification.objects.filter(uid__in=notification_uids).update(
+                status=NotificationsStatus.REMOVED
+            )
 
         return validated_data
