@@ -13,4 +13,5 @@ class NotificationsActionChoices(TextChoices):
     UNDEFINED = "UNDEFINED", "Undefined"
     MARK_ALL_AS_READ = "MARK_ALL_AS_READ", "Mark_All_As_Read"
     MARK_AS_READ = "MARK_AS_READ", "Mark_As_Read"
-    REMOVE_ALL = "REMOVE_ALL", "Remove_All"
+    REMOVED_ALL = "REMOVED_ALL", "Removed_All"
+    MARK_AS_REMOVED = "MARK_AS_REMOVED", "Mark_As_Removed"
