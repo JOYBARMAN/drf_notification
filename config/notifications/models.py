@@ -5,10 +5,6 @@ from django.db import transaction
 from django.db import models
 from django.contrib.auth import get_user_model
 from django_currentuser.db.models import CurrentUserField
-from django_currentuser.middleware import (
-    get_current_user,
-    get_current_authenticated_user,
-)
 from django.core.exceptions import ValidationError
 from django.db.models.query import QuerySet
 from django.db.models import Count, When, Case
@@ -46,30 +42,6 @@ class BaseModel(DirtyFieldsMixin, models.Model):
 
     class Meta:
         abstract = True
-
-
-class CustomNotificationField(models.Model):
-    class Meta:
-        abstract = True
-
-    @classmethod
-    def extend_notification_model(cls, notification_model):
-        """
-        Extend the notification model with custom fields.
-
-        Args:
-            notification_model (django.db.models.Model): The notification model to extend.
-
-        Notes:
-            This method dynamically adds custom fields from the CustomNotificationField
-            class to the provided notification_model.
-        """
-        # Get all fields from the custom field class
-        custom_fields = cls._meta.fields
-
-        # Add each custom field to the Notification model
-        for field in custom_fields:
-            field.contribute_to_class(notification_model, field.name)
 
 
 class Notification(BaseModel):
@@ -141,7 +113,7 @@ class Notification(BaseModel):
             status=NotificationsStatus.ACTIVE
         ).order_by("-pk")
 
-    def get_current_user_notifications(self):
+    def get_current_user_notifications(self, user):
         """
         Retrieve notifications for the current user if notifications are enabled.
 
@@ -152,11 +124,11 @@ class Notification(BaseModel):
             ValueError: If notifications are not enabled for the current user.
         """
 
-        if NotificationSettings().is_user_enable_notification():
+        if NotificationSettings().is_user_enable_notification(user=user):
             user_notifications = (
                 Notification()
                 .get_active_notifications()
-                .filter(user=get_current_authenticated_user())
+                .filter(user=user)
                 .select_related("user", "created_by")
             )
             # Aggregate the counts
@@ -304,14 +276,8 @@ class NotificationSettings(BaseModel):
         """
         return f"{self.user.username} - Notifications Enabled: {self.is_enable_notification}"
 
-    def is_user_enable_notification(self):
+    def is_user_enable_notification(self, user):
         try:
-            return self.__class__.objects.get(
-                user=get_current_authenticated_user()
-            ).is_enable_notification
+            return self.__class__.objects.get(user=user).is_enable_notification
         except self.__class__.DoesNotExist:
             raise ValueError("Notification settings instance missing for this user")
-
-
-# Automatically extend Notification model with custom fields
-CustomNotificationField.extend_notification_model(Notification)
