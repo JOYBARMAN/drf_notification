@@ -21,7 +21,9 @@ class UserNotificationList(generics.RetrieveUpdateAPIView):
 
     def get_object(self):
         try:
-            queryset = Notification().get_current_user_notifications()
+            queryset = Notification().get_current_user_notifications(
+                user=self.request.user
+            )
             notifications = queryset["notifications"].all()
 
             # Apply filter for is_read or unread notifications
@@ -65,7 +67,7 @@ class UserNotificationDetail(generics.RetrieveUpdateAPIView):
             # Get user notification single instance
             notification = (
                 Notification()
-                .get_current_user_notifications()["notifications"]
+                .get_current_user_notifications(user=self.request.user)["notifications"]
                 .filter(uid=uid)
                 .first()
             )
