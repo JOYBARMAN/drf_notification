@@ -1,19 +1,16 @@
 import uuid
-import jsonschema
 
 from django.db import transaction
 from django.db import models
 from django.contrib.auth import get_user_model
 from django_currentuser.db.models import CurrentUserField
-from django.core.exceptions import ValidationError
 from django.db.models.query import QuerySet
 from django.db.models import Count, When, Case
 
 from notifications.choices import NotificationsStatus
-from notifications.schema_validations import NOTIFICATION_SCHEMA
 
 from dirtyfields import DirtyFieldsMixin
-from jsonschema import validate
+
 
 User = get_user_model()
 
@@ -45,6 +42,8 @@ class BaseModel(DirtyFieldsMixin, models.Model):
 
 
 class Notification(BaseModel):
+    """Notification model to store user notifications."""
+
     # The user associated with this notification.
     user = models.ForeignKey(
         User,
@@ -93,14 +92,12 @@ class Notification(BaseModel):
 
     def clean(self):
         """
-        Perform JSON schema validation for the notification field.
+        Perform this action before saving the model instance.
         """
-        super().clean()
+        from notifications.utils import validate_notification
 
-        try:
-            validate(instance=self.notification, schema=NOTIFICATION_SCHEMA)
-        except jsonschema.exceptions.ValidationError as e:
-            raise ValidationError({"notification": str(e)})
+        super().clean()
+        validate_notification(notification_data=self.notification, use_for_model=True)
 
     def get_active_notifications(self):
         """
@@ -174,82 +171,34 @@ class Notification(BaseModel):
             .filter(is_read=True)
         )
 
-    @classmethod
-    def create_notifications(cls, notification, users, **kwargs):
-        """
-        Create notifications for multiple users efficiently.
+    def create_notification_for_users(
+        self, notification_data: dict, users: QuerySet, **kwargs
+    ):
+        """Create notifications for multiple users efficiently."""
+        from notifications.utils import validate_notification
 
-        Args:
-            notification (dict): Dictionary containing notification details.
-            users (list, QuerySet, or User): Users for whom notifications will be created.
-            **kwargs: Additional keyword arguments to be passed to the Notification model.
+        # Validate notification data
+        validate_notification(notification_data=notification_data)
 
-        Returns:
-            dict: A dictionary containing created notifications and missing users.
+        # Create notification instances for each user
+        notification_instance = [
+            Notification(user=user, notification=notification_data, **kwargs)
+            for user in users
+        ]
 
-        Raises:
-            ValueError: If users parameter is not a list, QuerySet, or User.
-            ValueError: If notification object does not contain required keys.
-
-        Note:
-            This method efficiently creates notifications for multiple users using bulk_create.
-            It checks if the notification object contains required keys ('message' and 'object').
-            It then creates notifications for each user found in the database, using bulk_create
-            to insert them in a single query. It returns a dictionary containing the created
-            notifications and any missing users not found in the database.
-        """
-
-        # Check if users is a single User object and convert it to a list
-        if isinstance(users, User):
-            users = [users]
-
-        if not isinstance(users, (list, QuerySet)):
-            raise ValueError("Users must be a list, QuerySet, or a User object")
-
-        # Check if notification contains required keys
-        required_keys = ["message", "object"]
-        if not all(key in notification for key in required_keys):
-            raise ValueError(
-                "Notification object must contain required keys: {}".format(
-                    ", ".join(required_keys)
+        try:
+            with transaction.atomic():
+                created_notifications = Notification.objects.bulk_create(
+                    notification_instance
                 )
-            )
+        except Exception as e:
+            raise ValueError(f"Error in bulk create notifications: {str(e)}")
 
-        # Convert list of users to QuerySet if necessary
-        if isinstance(users, list):
-            user_ids = [user.id for user in users]
-            user_queryset = User.objects.filter(id__in=user_ids)
-        else:
-            user_queryset = users
+        # Time to handle the signal for bulk create
+        from notifications.signals import post_bulk_create
+        post_bulk_create.send(sender=Notification, instances=created_notifications)
 
-        # Get IDs of users found in the database
-        found_user_ids = set(user_queryset.values_list("id", flat=True))
-
-        # Find missing user IDs
-        if isinstance(users, list):
-            all_user_ids = {user.id for user in users}
-        else:
-            all_user_ids = set(users.values_list("id", flat=True))
-
-        missing_user_ids = all_user_ids - found_user_ids
-
-        # Create a list of Notification objects for each user
-        notifications_to_create = []
-        for user in user_queryset:
-            notifications_to_create.append(
-                Notification(user=user, notification=notification, **kwargs)
-            )
-
-        # Use bulk_create to insert notifications into the database in a single query
-        with transaction.atomic():
-            created_notifications = Notification.objects.bulk_create(
-                notifications_to_create
-            )
-
-        return {
-            "created_notifications": created_notifications,
-            "missing_users": User.objects.filter(id__in=missing_user_ids),
-        }
+        return created_notifications
 
 
 class NotificationSettings(BaseModel):

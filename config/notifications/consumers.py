@@ -69,9 +69,16 @@ class NotificationConsumer(AsyncWebsocketConsumer):
             await self.send(text_data=json.dumps({"error": "User not authenticated"}))
             return
 
-        notifications = await database_sync_to_async(get_serialized_notifications)(
-            user=user
-        )
+        try:
+            # Get the user's notifications
+            notifications = await database_sync_to_async(get_serialized_notifications)(
+                user=user
+            )
+        except ValueError as e:
+            # Handle the error when user not enabled the notification settings
+            await self.send(text_data=json.dumps({"error": str(e)}))
+            return
+
         await self.send(text_data=json.dumps(notifications))
 
     async def disconnect(self, close_code):
