@@ -14,7 +14,7 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument(
-            "--total", type=int, default=1000, help="Number of users to create"
+            "--total", type=int, default=10, help="Number of users to create"
         )
 
     def handle(self, *args, **kwargs):
@@ -49,8 +49,8 @@ class Command(BaseCommand):
             "object": {"uid": "baebd6f0-be33-481f-894d-07f3404e87a5"},
         }
         kwargs = {"created_by": default_user}
-        Notification().create_notifications(
-            notification=notification, users=user_list, **kwargs
+        Notification().create_notification_for_users(
+            notification_data=notification, users=user_list, **kwargs
         )
 
         self.stdout.write(

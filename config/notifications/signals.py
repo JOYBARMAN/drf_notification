@@ -1,29 +1,24 @@
 from django.db.models.signals import post_save, post_delete
-from django.dispatch import receiver
+from django.dispatch import receiver, Signal
 from django.contrib.auth import get_user_model
 
 from notifications.models import NotificationSettings, Notification
-from notifications.utils import get_group_name, get_serialized_notifications
+from notifications.utils import add_user_notification_to_group
 
 from channels.layers import get_channel_layer
-from asgiref.sync import async_to_sync
 
+# Define the custom signal
+post_bulk_create = Signal()
+
+# Get the channel layer
+channel_layer = get_channel_layer()
 
 User = get_user_model()
-channel_layer = get_channel_layer()
 
 
 @receiver(post_save, sender=User)
 def create_notification_settings(sender, instance, created, **kwargs):
-    """
-    Signal handler to create NotificationSettings when a new User is created.
-
-    Args:
-        sender (class): The class from which the signal is sent (User).
-        instance (User): The instance of the User model being saved.
-        created (bool): Indicates whether a new instance was created.
-        **kwargs: Additional keyword arguments.
-    """
+    """Handles the post_save signal for User instances."""
     if created:
         NotificationSettings.objects.create(user=instance)
 
@@ -31,37 +26,19 @@ def create_notification_settings(sender, instance, created, **kwargs):
 @receiver(post_save, sender=Notification)
 @receiver(post_delete, sender=Notification)
 def notification_change(sender, instance, **kwargs):
-    """
-    Reacts to changes in Notification objects.
-
-    This function handles post-save and post-delete signals for Notification instances.
-    Upon receiving these signals, it retrieves serialized notifications associated
-    with the affected user and broadcasts the updated data to the appropriate user group.
-
-    Args:
-        sender: The model class sending the signal (Notification).
-        instance: The specific instance of Notification that triggered the signal.
-        **kwargs: Additional keyword arguments provided by the signal.
-
-    Notes:
-        - Requires a valid instance.user for processing.
-        - Uses synchronous channel layer operations for group message broadcasting.
-
-    Returns:
-        None
-    """
+    """Handles the post_save and post_delete signals for Notification instances."""
     if instance.user:
         user = instance.user
 
-        # Fetch the user's serialized notifications
-        notifications = get_serialized_notifications(user=user)
+        # Add user notification to group
+        add_user_notification_to_group(user=user, channel_layer=channel_layer)
 
-        # Send the data to the user's group
-        group_name = get_group_name(user=user)
-        async_to_sync(channel_layer.group_send)(
-            group_name,
-            {
-                "type": "notification.update",
-                "user_notifications": notifications,
-            },
-        )
+
+@receiver(post_bulk_create, sender=Notification)
+def handle_post_bulk_create(sender, instances, **kwargs):
+    """Handles the post_bulk_create signal for Notification instances."""
+
+    users = [instance.user for instance in instances]
+    for user in users:
+        # Add user notification to group
+        add_user_notification_to_group(user=user, channel_layer=channel_layer)
