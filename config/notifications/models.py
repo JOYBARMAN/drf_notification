@@ -185,20 +185,10 @@ class Notification(BaseModel):
             Notification(user=user, notification=notification_data, **kwargs)
             for user in users
         ]
+        for notification in notification_instance:
+            notification.save()
 
-        try:
-            with transaction.atomic():
-                created_notifications = Notification.objects.bulk_create(
-                    notification_instance
-                )
-        except Exception as e:
-            raise ValueError(f"Error in bulk create notifications: {str(e)}")
-
-        # Time to handle the signal for bulk create
-        from notifications.signals import post_bulk_create
-        post_bulk_create.send(sender=Notification, instances=created_notifications)
-
-        return created_notifications
+        return
 
 
 class NotificationSettings(BaseModel):
