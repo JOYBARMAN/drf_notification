@@ -192,6 +192,7 @@ class Notification(BaseModel):
 
 
 class NotificationSettings(BaseModel):
+    """ Model to store user notification settings."""
     user = models.OneToOneField(
         User,
         on_delete=models.CASCADE,
@@ -216,6 +217,7 @@ class NotificationSettings(BaseModel):
         return f"{self.user.username} - Notifications Enabled: {self.is_enable_notification}"
 
     def is_user_enable_notification(self, user):
+        """ Check if notifications are enabled for the user """
         try:
             return self.__class__.objects.get(user=user).is_enable_notification
         except self.__class__.DoesNotExist:

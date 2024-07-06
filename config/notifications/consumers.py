@@ -6,7 +6,6 @@ from django.contrib.auth import get_user_model
 from notifications.utils import (
     get_serialized_notifications,
     get_user,
-    validate_token,
     get_group_name,
 )
 
@@ -21,53 +20,38 @@ logger = logging.getLogger(__name__)
 class NotificationConsumer(AsyncWebsocketConsumer):
 
     async def connect(self):
-        # Get token from the URL
-        token = self.scope["url_route"]["kwargs"].get("access_token")
+        # Accept connection
+        await self.accept()
 
-        if token:
-            user_id = validate_token(token=token)
-            if not user_id:
-                await self.close()
-                return
-        else:
-            # Token not found in the URL
+        if self.is_error_exists():
+            error = {"error": str(self.scope["error"])}
+            await self.send(text_data=json.dumps(error))
             await self.close()
             return
 
+        # Get the user_id from the scope
+        user_id = self.scope.get("user_id")
+
+        # Get the user instance
         user = await get_user(user_id)
-
-        if user:
-            self.scope["user"] = user
-            self.scope["token"] = token
-
-            # Add user to group
-            self.group_name = get_group_name(user=user)
-            await self.channel_layer.group_add(
-                self.group_name,
-                self.channel_name,
-            )
-
-            # Accept connection
-            await self.accept()
-
-        else:
-            # User not found
+        if not user:
+            user_error = {"error": "User not found"}
+            await self.send(text_data=json.dumps(user_error))
             await self.close()
+            return
+
+        # Add user to the scope
+        self.scope["user"] = user
+
+        # Add user to group
+        self.group_name = get_group_name(user=user)
+        await self.channel_layer.group_add(
+            self.group_name,
+            self.channel_name,
+        )
 
     async def receive(self, text_data=None):
         user = self.scope.get("user")
-        token_valid = validate_token(token=self.scope.get("token"))
-
-        # Return error message if token or user is invalid
-        if not token_valid:
-            await self.send(
-                text_data=json.dumps({"error": "Token may be invalid or expired"})
-            )
-            return
-
-        if not user:
-            await self.send(text_data=json.dumps({"error": "User not authenticated"}))
-            return
 
         try:
             # Get the user's notifications
@@ -88,9 +72,9 @@ class NotificationConsumer(AsyncWebsocketConsumer):
                 self.group_name,
                 self.channel_name,
             )
+            logger.warning(f"disconnected {close_code}")
 
-        self.close()
-        logger.warning(f"disconnected {close_code}")
+        await self.close()
 
     async def notification_update(self, event):
         # Update the user's notifications when any change occurs in the Notification model
@@ -98,3 +82,8 @@ class NotificationConsumer(AsyncWebsocketConsumer):
         if user:
             notifications = event["user_notifications"]
             await self.send(text_data=json.dumps(notifications))
+
+    def is_error_exists(self):
+        # Checks if error exists during websockets
+
+        return True if "error" in self.scope else False

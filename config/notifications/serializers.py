@@ -46,6 +46,19 @@ class NotificationSerializer(serializers.ModelSerializer):
         read_only_fields = fields.copy()
         read_only_fields.remove("status")
 
+    # def create(self, validated_data):
+    #     notification = {
+    #         "message": "Hello, this is a test notification",
+    #         "object": {
+    #             "uid": "baebd6f0-be33-481f-894d-07f3404e87a5",
+    #             "info": {"key": "value"},
+    #         },
+    #     }
+    #     Notification().create_notification_for_users(
+    #         users=User.objects.all(), notification_data=notification
+    #     )
+    #     return validated_data
+
 
 class UserNotificationListWithCountSerializer(serializers.Serializer):
     """Serializer for user notification with count instance"""
