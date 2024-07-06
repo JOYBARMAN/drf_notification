@@ -83,3 +83,7 @@ class UserNotificationDetail(generics.RetrieveUpdateAPIView):
 
         except ValueError as e:
             raise ValidationError({"detail": str(e)})
+
+# class CreateBulkNotification(generics.CreateAPIView):
+#     serializer_class = NotificationSerializer
+#     permission_classes = [IsAuthenticated]

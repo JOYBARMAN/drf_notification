@@ -41,8 +41,12 @@ def get_user(user_id):
     try:
         return User.objects.get(id=user_id)
     except User.DoesNotExist:
-        logger.error(f"User not found")
         return None
+
+
+def serialized_notifications(notifications):
+    """Serialize the notifications"""
+    return UserNotificationListWithCountSerializer(notifications).data
 
 
 def get_serialized_notifications(
@@ -54,8 +58,7 @@ def get_serialized_notifications(
     except ValueError as e:
         return {"error": str(e)}
 
-    serialized_data = UserNotificationListWithCountSerializer(notifications).data
-    return serialized_data
+    return serialized_notifications(notifications)
 
 
 def update_notification_read_status(notifications, is_read=True):
@@ -112,3 +115,43 @@ def add_user_notification_to_group(user, channel_layer):
             "user_notifications": notifications,
         },
     )
+
+
+def get_token_from_scope(scope):
+    """Extract the token from the scope."""
+
+    headers = dict(scope.get("headers", {}))
+
+    # Extract the authorizations header
+    authorizations = headers.get(b"authorizations")
+
+    if authorizations:
+        # Decode the bytes to a string
+        decoded_auth = authorizations.decode("utf-8")
+        # Split the string and check if it contains at least two parts
+        parts = decoded_auth.split(" ")
+        if len(parts) == 2 and parts[0] == "Bearer":
+            return parts[1]
+    else:
+        return None
+
+
+# def add_multiple_user_notifications_to_group(users, channel_layer):
+#     """Add multiple user notifications to the group for broadcasting"""
+
+#     users_notifications_data = Notification().get_multiple_users_notifications(
+#         users=users
+#     )
+
+#     for user_notifications in users_notifications_data:
+#         # Send the data to the user's group
+#         group_name = get_group_name(user=user_notifications["user"])
+#         user_notifications.pop("user")
+
+#         async_to_sync(channel_layer.group_send)(
+#             group_name,
+#             {
+#                 "type": "notification.update",
+#                 "user_notifications": serialized_notifications(user_notifications),
+#             },
+#         )

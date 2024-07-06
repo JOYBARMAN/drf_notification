@@ -3,7 +3,10 @@ from django.dispatch import receiver, Signal
 from django.contrib.auth import get_user_model
 
 from notifications.models import NotificationSettings, Notification
-from notifications.utils import add_user_notification_to_group
+from notifications.utils import (
+    add_user_notification_to_group,
+    # add_multiple_user_notifications_to_group,
+)
 
 from channels.layers import get_channel_layer
 
@@ -34,11 +37,9 @@ def notification_change(sender, instance, **kwargs):
         add_user_notification_to_group(user=user, channel_layer=channel_layer)
 
 
-@receiver(post_bulk_create, sender=Notification)
-def handle_post_bulk_create(sender, instances, **kwargs):
-    """Handles the post_bulk_create signal for Notification instances."""
+# @receiver(post_bulk_create, sender=Notification)
+# def handle_post_bulk_create(sender, instances, **kwargs):
+#     """Handles the post_bulk_create signal for Notification instances."""
 
-    users = [instance.user for instance in instances]
-    for user in users:
-        # Add user notification to group
-        add_user_notification_to_group(user=user, channel_layer=channel_layer)
+#     users = [instance.user for instance in instances]
+#     add_multiple_user_notifications_to_group(users=users, channel_layer=channel_layer)
