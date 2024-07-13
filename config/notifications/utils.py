@@ -1,6 +1,7 @@
 import logging
 import jsonschema
 
+from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
 
@@ -17,6 +18,7 @@ from asgiref.sync import async_to_sync
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
+ALLOWED_NOTIFICATION_DATA = getattr(settings, "ALLOWED_NOTIFICATION_DATA", False)
 
 
 def validate_token(token):
@@ -49,16 +51,22 @@ def serialized_notifications(notifications):
     return UserNotificationListWithCountSerializer(notifications).data
 
 
-def get_serialized_notifications(
-    user,
-):
+def get_serialized_notifications(user, allowed_notification_data=True):
     """Get notifications for the user and return serialized data"""
     try:
         notifications = Notification().get_current_user_notifications(user=user)
     except ValueError as e:
         return {"error": str(e)}
 
-    return serialized_notifications(notifications)
+    serialized_notification = serialized_notifications(notifications)
+
+    # Check is the user want to get the notification data in websocket response
+    # This is optional feature for user websocket notification to see the notification data in response please set ALLOWED_NOTIFICATION_DATA=True in settings.py
+    if not allowed_notification_data:
+        serialized_notification.pop("notifications")
+        return serialized_notification
+
+    return serialized_notification
 
 
 def update_notification_read_status(notifications, is_read=True):
@@ -104,7 +112,9 @@ def add_user_notification_to_group(user, channel_layer):
     """Add user notification to the group for broadcasting"""
 
     # Fetch the user's serialized notifications
-    notifications = get_serialized_notifications(user=user)
+    notifications = get_serialized_notifications(
+        user=user, allowed_notification_data=ALLOWED_NOTIFICATION_DATA
+    )
 
     # Send the data to the user's group
     group_name = get_group_name(user=user)

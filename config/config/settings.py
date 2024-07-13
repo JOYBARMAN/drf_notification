@@ -29,23 +29,24 @@ DEBUG = True
 ALLOWED_HOSTS = []
 
 
-# Application definition
-
-INSTALLED_APPS = [
-    "daphne",
+# Application Apps
+DEFAULT_APPS = [
     "django.contrib.admin",
     "django.contrib.auth",
     "django.contrib.contenttypes",
     "django.contrib.sessions",
     "django.contrib.messages",
     "django.contrib.staticfiles",
-    # Local apps
-    "notifications.apps.NotificationsConfig",
-    # Third party apps
+]
+CHANNELS_APPS = ["daphne"]
+LOCAL_APPS = ["notifications.apps.NotificationsConfig"]
+THIRD_PARTY_APPS = [
     "rest_framework",
     "rest_framework_simplejwt",
     "silk",
 ]
+
+INSTALLED_APPS = CHANNELS_APPS + DEFAULT_APPS + LOCAL_APPS + THIRD_PARTY_APPS
 
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
@@ -155,3 +156,6 @@ SIMPLE_JWT = {
     "ACCESS_TOKEN_LIFETIME": timedelta(days=60),
     "REFRESH_TOKEN_LIFETIME": timedelta(days=60),
 }
+
+# Settings for if notifications instance want to use the websocket
+ALLOWED_NOTIFICATION_DATA = False
