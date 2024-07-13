@@ -103,20 +103,25 @@ class UserNotificationListWithCountSerializer(serializers.Serializer):
         action_choice = validated_data.get("action_choice")
         notifications = instance["notifications"]
         notification_uids = validated_data.get("notification_uids", [])
+        user = self.context["request"].user
 
         # Mark all as read
         if action_choice == NotificationsActionChoices.MARK_ALL_AS_READ:
             # Update all notifications as read status
-            notifications = Notification.objects.filter(
-                id__in=[notification.id for notification in notifications],
-                is_read=False,
+            notifications = (
+                Notification()
+                .get_active_notifications()
+                .filter(
+                    user=user,
+                    is_read=False,
+                )
             )
             update_notification_read_status(notifications=notifications)
 
         # Mark as read all selected notifications
         elif action_choice == NotificationsActionChoices.MARK_AS_READ:
             # Update selected notifications as read
-            notifications = Notification.objects.filter(
+            notifications = Notification().get_active_notifications().filter(
                 uid__in=notification_uids, is_read=False
             )
             update_notification_read_status(notifications=notifications)
@@ -124,9 +129,7 @@ class UserNotificationListWithCountSerializer(serializers.Serializer):
         # Removed all notifications
         elif action_choice == NotificationsActionChoices.REMOVED_ALL:
             # Remove all notifications
-            notifications = Notification.objects.filter(
-                id__in=[notification.id for notification in notifications]
-            )
+            notifications = Notification().get_active_notifications().filter(user=user)
             update_notification_status(
                 notifications=notifications, status=NotificationsStatus.REMOVED
             )
@@ -134,7 +137,7 @@ class UserNotificationListWithCountSerializer(serializers.Serializer):
         # Mark as removed all selected notifications
         elif action_choice == NotificationsActionChoices.MARK_AS_REMOVED:
             # Remove selected notifications
-            notifications = Notification.objects.filter(uid__in=notification_uids)
+            notifications = Notification().get_active_notifications().filter(uid__in=notification_uids)
             update_notification_status(
                 notifications=notifications, status=NotificationsStatus.REMOVED
             )

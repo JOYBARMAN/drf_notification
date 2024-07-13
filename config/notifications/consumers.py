@@ -2,6 +2,7 @@ import json
 import logging
 
 from django.contrib.auth import get_user_model
+from django.conf import settings
 
 from notifications.utils import (
     get_serialized_notifications,
@@ -15,6 +16,7 @@ from channels.db import database_sync_to_async
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
+ALLOWED_NOTIFICATION_DATA = getattr(settings, "ALLOWED_NOTIFICATION_DATA", False)
 
 
 class NotificationConsumer(AsyncWebsocketConsumer):
@@ -56,7 +58,7 @@ class NotificationConsumer(AsyncWebsocketConsumer):
         try:
             # Get the user's notifications
             notifications = await database_sync_to_async(get_serialized_notifications)(
-                user=user
+                user=user, allowed_notification_data=ALLOWED_NOTIFICATION_DATA
             )
         except ValueError as e:
             # Handle the error when user not enabled the notification settings
