@@ -16,7 +16,6 @@ from channels.db import database_sync_to_async
 
 User = get_user_model()
 logger = logging.getLogger(__name__)
-ALLOWED_NOTIFICATION_DATA = getattr(settings, "ALLOWED_NOTIFICATION_DATA", False)
 
 
 class NotificationConsumer(AsyncWebsocketConsumer):
@@ -58,7 +57,7 @@ class NotificationConsumer(AsyncWebsocketConsumer):
         try:
             # Get the user's notifications
             notifications = await database_sync_to_async(get_serialized_notifications)(
-                user=user, allowed_notification_data=ALLOWED_NOTIFICATION_DATA
+                user=user
             )
         except ValueError as e:
             # Handle the error when user not enabled the notification settings
