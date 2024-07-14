@@ -47,16 +47,19 @@ class NotificationSerializer(serializers.ModelSerializer):
         read_only_fields.remove("status")
 
     # def create(self, validated_data):
-    #     notification = {
-    #         "message": "Hello, this is a test notification",
-    #         "object": {
-    #             "uid": "baebd6f0-be33-481f-894d-07f3404e87a5",
-    #             "info": {"key": "value"},
-    #         },
-    #     }
+    #     from notifications.utils import create_notification_json
+
+    #     user = User.objects.filter().last()
+    #     notification = create_notification_json(
+    #         message="This is a test notification",
+    #         method="POST",
+    #         model=user,
+    #         serializer=UserSerializer,
+    #     )
     #     Notification().create_notification_for_users(
     #         users=User.objects.all(), notification_data=notification
     #     )
+
     #     return validated_data
 
 
@@ -121,8 +124,10 @@ class UserNotificationListWithCountSerializer(serializers.Serializer):
         # Mark as read all selected notifications
         elif action_choice == NotificationsActionChoices.MARK_AS_READ:
             # Update selected notifications as read
-            notifications = Notification().get_active_notifications().filter(
-                uid__in=notification_uids, is_read=False
+            notifications = (
+                Notification()
+                .get_active_notifications()
+                .filter(uid__in=notification_uids, is_read=False)
             )
             update_notification_read_status(notifications=notifications)
 
@@ -137,7 +142,11 @@ class UserNotificationListWithCountSerializer(serializers.Serializer):
         # Mark as removed all selected notifications
         elif action_choice == NotificationsActionChoices.MARK_AS_REMOVED:
             # Remove selected notifications
-            notifications = Notification().get_active_notifications().filter(uid__in=notification_uids)
+            notifications = (
+                Notification()
+                .get_active_notifications()
+                .filter(uid__in=notification_uids)
+            )
             update_notification_status(
                 notifications=notifications, status=NotificationsStatus.REMOVED
             )

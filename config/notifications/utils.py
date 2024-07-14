@@ -1,11 +1,15 @@
 import logging
 import jsonschema
+import json
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.core import serializers
+from django.db.models.query import QuerySet
 
 from rest_framework_simplejwt.tokens import AccessToken
+from rest_framework.exceptions import ValidationError
 
 from notifications.choices import NotificationsStatus
 from notifications.schema_validations import NOTIFICATION_SCHEMA
@@ -51,7 +55,7 @@ def serialized_notifications(notifications):
     return UserNotificationListWithCountSerializer(notifications).data
 
 
-def get_serialized_notifications(user, allowed_notification_data=True):
+def get_serialized_notifications(user):
     """Get notifications for the user and return serialized data"""
     try:
         notifications = Notification().get_current_user_notifications(user=user)
@@ -61,8 +65,8 @@ def get_serialized_notifications(user, allowed_notification_data=True):
     serialized_notification = serialized_notifications(notifications)
 
     # Check is the user want to get the notification data in websocket response
-    # This is optional feature for user websocket notification to see the notification data in response please set ALLOWED_NOTIFICATION_DATA=True in settings.py
-    if not allowed_notification_data:
+    # If ALLOWED_NOTIFICATION_DATA=True in settings.py we show the notification data in websocket response
+    if not ALLOWED_NOTIFICATION_DATA:
         serialized_notification.pop("notifications")
         return serialized_notification
 
@@ -94,27 +98,55 @@ def validate_notification(notification_data: dict, use_for_model=False):
     try:
         jsonschema.validate(instance=notification_data, schema=NOTIFICATION_SCHEMA)
     except jsonschema.exceptions.ValidationError as e:
-
+        # Create a readable message for notification message
         valid_schema_message = {
             "message": "Your Message you want to send in notification",
-            "object": {"Your Model Object"},
+            "object": {"Model instance, which model is responsible for notification"},
         }
-
         message = f"Notification object must be a valid JSON schema such as {valid_schema_message}"
 
+        # If the validation is for model then raise ValidationError
         if use_for_model:
             raise ValidationError(message)
 
         raise ValueError(message)
 
 
+def create_notification_json(
+    message: str = None, model: QuerySet = None, serializer=None, method="UNDEFINED"
+):
+    """Create a notification field json data for notification model"""
+
+    # Handle the required fields error
+    required_fields = {"message": message, "model": model}
+    for field_name, field_value in required_fields.items():
+        if not field_value:
+            raise ValidationError(f"{field_name} is required for notification")
+
+    # Serialize the queryset/model to JSON
+    if serializer:
+        serialized_model = serializer(model).data
+    else:
+        serialized_model = json.loads(serializers.serialize("json", [model]))[0]
+
+    # Arrange the notification object
+    notification = {
+        "message": message,
+        "object": serialized_model,
+        "method": method,
+    }
+
+    # Validate the notification against the schema
+    validate_notification(notification)
+
+    return notification
+
+
 def add_user_notification_to_group(user, channel_layer):
     """Add user notification to the group for broadcasting"""
 
     # Fetch the user's serialized notifications
-    notifications = get_serialized_notifications(
-        user=user, allowed_notification_data=ALLOWED_NOTIFICATION_DATA
-    )
+    notifications = get_serialized_notifications(user=user)
 
     # Send the data to the user's group
     group_name = get_group_name(user=user)
@@ -144,24 +176,3 @@ def get_token_from_scope(scope):
             return parts[1]
     else:
         return None
-
-
-# def add_multiple_user_notifications_to_group(users, channel_layer):
-#     """Add multiple user notifications to the group for broadcasting"""
-
-#     users_notifications_data = Notification().get_multiple_users_notifications(
-#         users=users
-#     )
-
-#     for user_notifications in users_notifications_data:
-#         # Send the data to the user's group
-#         group_name = get_group_name(user=user_notifications["user"])
-#         user_notifications.pop("user")
-
-#         async_to_sync(channel_layer.group_send)(
-#             group_name,
-#             {
-#                 "type": "notification.update",
-#                 "user_notifications": serialized_notifications(user_notifications),
-#             },
-#         )

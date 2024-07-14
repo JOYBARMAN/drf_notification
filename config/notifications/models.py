@@ -180,6 +180,10 @@ class Notification(BaseModel):
         # Validate notification data
         validate_notification(notification_data=notification_data)
 
+        # If users is a single user instance, convert it to a queryset
+        if not isinstance(users, QuerySet):
+            users = QuerySet(model=User).filter(id=users.id)
+
         # Create notification instances for each user
         notification_instance = [
             Notification(user=user, notification=notification_data, **kwargs)

@@ -85,5 +85,6 @@ class UserNotificationDetail(generics.RetrieveUpdateAPIView):
             raise ValidationError({"detail": str(e)})
 
 # class CreateBulkNotification(generics.CreateAPIView):
+#     queryset=Notification.objects.all()
 #     serializer_class = NotificationSerializer
 #     permission_classes = [IsAuthenticated]
