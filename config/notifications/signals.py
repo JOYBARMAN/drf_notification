@@ -1,17 +1,14 @@
 from django.db.models.signals import post_save, post_delete
-from django.dispatch import receiver, Signal
+from django.dispatch import receiver
 from django.contrib.auth import get_user_model
+from django.core.cache import cache
 
 from notifications.models import NotificationSettings, Notification
 from notifications.utils import (
     add_user_notification_to_group,
-    # add_multiple_user_notifications_to_group,
 )
 
 from channels.layers import get_channel_layer
-
-# Define the custom signal
-post_bulk_create = Signal()
 
 # Get the channel layer
 channel_layer = get_channel_layer()
@@ -36,10 +33,5 @@ def notification_change(sender, instance, **kwargs):
         # Add user notification to group
         add_user_notification_to_group(user=user, channel_layer=channel_layer)
 
-
-# @receiver(post_bulk_create, sender=Notification)
-# def handle_post_bulk_create(sender, instances, **kwargs):
-#     """Handles the post_bulk_create signal for Notification instances."""
-
-#     users = [instance.user for instance in instances]
-#     add_multiple_user_notifications_to_group(users=users, channel_layer=channel_layer)
+        # Remove cache for the user
+        cache.delete(user.id)
