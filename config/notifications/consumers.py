@@ -2,7 +2,6 @@ import json
 import logging
 
 from django.contrib.auth import get_user_model
-from django.conf import settings
 
 from notifications.utils import (
     get_serialized_notifications,
@@ -51,6 +50,9 @@ class NotificationConsumer(AsyncWebsocketConsumer):
             self.channel_name,
         )
 
+        # Send the user's notifications
+        await self.receive()
+
     async def receive(self, text_data=None):
         user = self.scope.get("user")
 
@@ -86,5 +88,4 @@ class NotificationConsumer(AsyncWebsocketConsumer):
 
     def is_error_exists(self):
         # Checks if error exists during websockets
-
         return True if "error" in self.scope else False
