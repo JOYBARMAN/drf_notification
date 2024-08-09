@@ -50,6 +50,9 @@ class NotificationConsumer(AsyncWebsocketConsumer):
             self.channel_name,
         )
 
+        # Send the user's notifications
+        await self.receive()
+
     async def receive(self, text_data=None):
         user = self.scope.get("user")
 
