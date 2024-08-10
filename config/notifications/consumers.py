@@ -4,7 +4,7 @@ import logging
 from django.contrib.auth import get_user_model
 
 from notifications.utils import (
-    get_serialized_notifications,
+    get_user_serialized_notifications,
     get_user,
     get_group_name,
 )
@@ -58,7 +58,7 @@ class NotificationConsumer(AsyncWebsocketConsumer):
 
         try:
             # Get the user's notifications
-            notifications = await database_sync_to_async(get_serialized_notifications)(
+            notifications = await database_sync_to_async(get_user_serialized_notifications)(
                 user=user
             )
         except ValueError as e:

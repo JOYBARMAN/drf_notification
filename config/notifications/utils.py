@@ -57,7 +57,7 @@ def serialized_notifications(notifications):
     return UserNotificationListWithCountSerializer(notifications).data
 
 
-def get_serialized_notifications(user):
+def get_user_serialized_notifications(user):
     """Get notifications for the user and return serialized data"""
     try:
         notifications = Notification().get_current_user_notifications(user=user)
@@ -148,7 +148,7 @@ def add_user_notification_to_group(user, channel_layer):
     """Add user notification to the group for broadcasting"""
 
     # Fetch the user's serialized notifications
-    notifications = get_serialized_notifications(user=user)
+    notifications = get_user_serialized_notifications(user=user)
 
     # Send the data to the user's group
     group_name = get_group_name(user=user)
