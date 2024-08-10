@@ -1,26 +1,28 @@
-from django.test import TestCase
+from . import urlhelpers, test_helpers, base_test
 
 from config.asgi import application
-
-from .test_helpers import create_user, get_user_token
-from .payloads import user_payload
-
 from channels.testing import WebsocketCommunicator
 
 
-class WebSocketNotificationTests(TestCase):
-    async def test_notification_consumer(self):
-        # Create user
-        user = await create_user(**user_payload())
+class TestNotificationWebSocketApi(base_test.BaseTest):
+    """Test case for notification consumer is working properly or not"""
+
+    def setUp(self):
+        super().setUp()
+
+    async def test_connect_notification_consumer(self):
+        """Connect to notification consumer"""
 
         # Generate user token
-        access_token = await get_user_token(user)
+        access_token = await test_helpers.get_user_token(self.user)
         bearer_token = f"Bearer {access_token.get('access')}"
+
+        ws_url = urlhelpers.get_notification_ws_url()
 
         # Initialize WebSocket communicator
         communicator = WebsocketCommunicator(
             application,
-            "/ws/ac/me/notifications/",
+            ws_url,
             headers=[
                 (
                     b"authorizations",
@@ -33,14 +35,31 @@ class WebSocketNotificationTests(TestCase):
         connected, _ = await communicator.connect()
         self.assertTrue(connected)
 
-        # Send a message to the WebSocket
-        await communicator.send_json_to({"type": "test.message"})
+        return communicator
+
+    async def test_receive_notification_consumer(self):
+        """Receive notification from consumer"""
+
+        communicator = await self.test_connect_notification_consumer()
 
         # Receive a message from the WebSocket and check its content
         response = await communicator.receive_json_from()
-        self.assertIn("total_notifications", response)
-        self.assertIn("read_notifications", response)
-        self.assertIn("unread_notifications", response)
 
-        # Close the WebSocket connection
+        self.assertIn("total_notifications", response) and self.assertEqual(
+            response["total_notifications"], self.total_created_notification
+        )
+        self.assertIn("unread_notifications", response) and self.assertEqual(
+            response["unread_notifications"], self.total_created_notification
+        )
+        self.assertIn("read_notifications", response) and self.assertEqual(
+            response["read_notifications"],
+            response["total_notifications"] - response["unread_notifications"],
+        )
+
+    async def test_disconnect_notification_consumer(self):
+        """Disconnect to notification consumer"""
+
+        communicator = await self.test_connect_notification_consumer()
+
+        # Disconnect from the WebSocket
         await communicator.disconnect()
