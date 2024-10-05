@@ -113,7 +113,7 @@ AUTH_PASSWORD_VALIDATORS = [
 REST_FRAMEWORK = {
     "DEFAULT_AUTHENTICATION_CLASSES": (
         "rest_framework_simplejwt.authentication.JWTAuthentication",
-    )
+    ),
 }
 
 
@@ -159,3 +159,5 @@ SIMPLE_JWT = {
 
 # Settings for if notifications instance want to use the websocket
 ALLOWED_NOTIFICATION_DATA = False
+# Settings for defined user serializer
+NOTIFICATION_USER_SERIALIZER = 'notifications.serializers.CustomUserSerializer'
