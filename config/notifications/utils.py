@@ -4,7 +4,6 @@ import json
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
-from django.core.exceptions import ValidationError
 from django.core import serializers
 from django.db.models.query import QuerySet
 from django.core.cache import cache
@@ -97,13 +96,15 @@ def validate_notification(notification_data: dict, use_for_model=False):
     """
     Perform JSON schema validation for the notification field.
     """
+    from django.core.exceptions import ValidationError
+
     try:
         jsonschema.validate(instance=notification_data, schema=NOTIFICATION_SCHEMA)
     except jsonschema.exceptions.ValidationError as e:
         # Create a readable message for notification message
         valid_schema_message = {
             "message": "Your Message you want to send in notification",
-            "object": {"Model instance, which model is responsible for notification"},
+            "instance": {"Model instance, which model is responsible for notification"},
         }
         message = f"Notification object must be a valid JSON schema such as {valid_schema_message}"
 
@@ -114,8 +115,38 @@ def validate_notification(notification_data: dict, use_for_model=False):
         raise ValueError(message)
 
 
+def get_changed_fields(model_instance):
+    """Get the changed fields of a model instance"""
+
+    changed_data = {}
+
+    # Fetch the current instance from the database
+    original_instance = model_instance.__class__.objects.filter(pk=model_instance.pk).first()
+    if not original_instance:
+        raise ValueError("Provided model instance to get changed fields is not found in the database")
+
+    # Compare each field between the instance and its original state
+    for field in model_instance._meta.fields:
+        field_name = field.name
+        original_value = getattr(original_instance, field_name)
+        current_value = getattr(model_instance, field_name)
+
+        # If the field has changed, add it to the changed_data dictionary
+        if original_value != current_value:
+            changed_data[field_name] = {
+                "original": original_value,
+                "new": current_value,
+            }
+
+    return changed_data
+
+
 def create_notification_json(
-    message: str = None, model: QuerySet = None, serializer=None, method="UNDEFINED"
+    message: str = None,
+    model: QuerySet = None,
+    serializer=None,
+    method="UNDEFINED",
+    changed_data: dict = {},
 ):
     """Create a notification field json data for notification model"""
 
@@ -134,8 +165,9 @@ def create_notification_json(
     # Arrange the notification object
     notification = {
         "message": message,
-        "object": serialized_model,
+        "instance": serialized_model,
         "method": method,
+        "changed_data": changed_data,
     }
 
     # Validate the notification against the schema

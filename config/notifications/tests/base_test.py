@@ -1,6 +1,6 @@
 from rest_framework.test import APITestCase, APIClient
 
-from notifications.serializers import UserSerializer
+from notifications.serializers import get_user_serializer
 from . import payloads, test_helpers
 
 from asgiref.sync import async_to_sync
@@ -44,7 +44,7 @@ class BaseTest(APITestCase):
         """Create notification for user"""
         test_helpers.create_notification(
             model_data=self.user,
-            serializer=UserSerializer,
+            serializer=get_user_serializer(),
             user_list=self.user_list,
             notification_message=self.notification_message,
         )
