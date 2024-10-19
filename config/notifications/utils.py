@@ -7,6 +7,7 @@ from django.contrib.auth import get_user_model
 from django.core import serializers
 from django.db.models.query import QuerySet
 from django.core.cache import cache
+from django.forms.models import model_to_dict
 
 from rest_framework_simplejwt.tokens import AccessToken
 from rest_framework.exceptions import ValidationError
@@ -121,29 +122,100 @@ def get_changed_fields(model_instance):
     changed_data = {}
 
     # Fetch the current instance from the database
-    original_instance = model_instance.__class__.objects.filter(pk=model_instance.pk).first()
+    original_instance = model_instance.__class__.objects.filter(
+        pk=model_instance.pk
+    ).first()
+
     if not original_instance:
-        raise ValueError("Provided model instance to get changed fields is not found in the database")
+        raise ValueError(
+            "Provided model instance to get changed fields is not found in the database"
+        )
 
     # Compare each field between the instance and its original state
     for field in model_instance._meta.fields:
+        # Extract the field name and field type
         field_name = field.name
+        field_type = field.__class__.__name__
+
+        # Get the field value from the original and current instance
         original_value = getattr(original_instance, field_name)
         current_value = getattr(model_instance, field_name)
 
-        # If the field has changed, add it to the changed_data dictionary
+        # Handle model FK and O2O relationship changes
+        if field_type in ["ForeignKey", "OneToOneField"]:
+            original_value = model_to_dict(original_value) if original_value else None
+            current_value = model_to_dict(current_value) if current_value else None
+
+        # Handle JSONField comparison
+        if field_type == "JSONField":
+            changed_json_fields = compare_json_fields(
+                original_value or {}, current_value or {}
+            )
+            if changed_json_fields:
+                changed_data[field_name] = changed_json_fields
+            continue
+
         if original_value != current_value:
             changed_data[field_name] = {
                 "original": original_value,
                 "new": current_value,
             }
 
+    # Handle M2M relationship changes
+    if model_instance._meta.many_to_many:
+        changed_data = handle_many_to_many_field_comparison(
+            changed_data, model_instance, original_instance
+        )
+
     return changed_data
+
+
+def handle_many_to_many_field_comparison(
+    changed_data, model_instance, original_instance
+):
+    """Handle the many to many field comparison"""
+    for m2m_field in model_instance._meta.many_to_many:
+        field_name = m2m_field.name
+
+        original_value = list(getattr(original_instance, field_name).all().values())
+        current_value = list(getattr(model_instance, field_name).all().values())
+
+        # Check if both original and current values are empty
+        if not original_value and not current_value:
+            continue
+
+        # Use sets for comparison
+        original_value_set = {tuple(item.items()) for item in original_value}
+        current_value_set = {tuple(item.items()) for item in current_value}
+
+        # Find the added and removed values
+        added = current_value_set - original_value_set
+        removed = original_value_set - current_value_set
+
+        # Compare the M2M values
+        if added or removed:
+            changed_data[field_name] = {
+                "original": original_value,
+                "new": current_value,
+                "added": list(added) if added else None,
+                "removed": list(removed) if removed else None,
+            }
+
+    return changed_data
+
+
+def compare_json_fields(original, current):
+    """Compare two JSON objects and return only the changed fields."""
+    changes = {}
+    for key in set(original.keys()).union(current.keys()):
+        if original.get(key) != current.get(key):
+            changes[key] = {"original": original.get(key), "new": current.get(key)}
+    return changes if changes else None
 
 
 def create_notification_json(
     message: str = None,
-    model: QuerySet = None,
+    instance: QuerySet = None,
     serializer=None,
     method="UNDEFINED",
     changed_data: dict = {},
@@ -151,20 +223,21 @@ def create_notification_json(
     """Create a notification field json data for notification model"""
 
     # Handle the required fields error
-    required_fields = {"message": message, "model": model}
+    required_fields = {"message": message, "instance": instance}
     for field_name, field_value in required_fields.items():
         if not field_value:
             raise ValidationError(f"{field_name} is required for notification")
 
     # Serialize the queryset/model to JSON
     if serializer:
-        serialized_model = serializer(model).data
+        serialized_model = serializer(instance).data
     else:
-        serialized_model = json.loads(serializers.serialize("json", [model]))[0]
+        serialized_model = json.loads(serializers.serialize("json", [instance]))[0]
 
     # Arrange the notification object
     notification = {
         "message": message,
+        "model": instance.__class__.__name__,
         "instance": serialized_model,
         "method": method,
         "changed_data": changed_data,
