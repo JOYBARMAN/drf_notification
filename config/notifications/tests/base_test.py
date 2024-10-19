@@ -47,5 +47,6 @@ class BaseTest(APITestCase):
             serializer=get_user_serializer(),
             user_list=self.user_list,
             notification_message=self.notification_message,
+            requested_user=self.user,
         )
         return
