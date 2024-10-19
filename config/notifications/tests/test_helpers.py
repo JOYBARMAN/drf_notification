@@ -33,7 +33,7 @@ def get_user_list():
 
 
 def create_notification(
-    model_data: QuerySet, serializer, user_list, notification_message: list
+    model_data: QuerySet, serializer, user_list, notification_message: list, requested_user
 ):
     """Create a notification for testing"""
     for notification in notification_message:
@@ -46,7 +46,7 @@ def create_notification(
 
         # Create a notification
         notification = Notification().create_notification_for_users(
-            notification_data=notification_data, users=user_list
+            notification_data=notification_data, users=user_list, requested_user=requested_user
         )
 
     return
