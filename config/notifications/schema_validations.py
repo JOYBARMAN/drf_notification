@@ -2,6 +2,7 @@ NOTIFICATION_SCHEMA = {
     "type": "object",
     "properties": {
         "message": {"type": "string"},
+        "model": {"type": "string"},
         "instance": {"type": "object"},
         "method": {
             "type": "string",
@@ -9,5 +10,5 @@ NOTIFICATION_SCHEMA = {
         },
         "changed_data": {"type": "object"},
     },
-    "required": ["message", "instance", "method", "changed_data"],
+    "required": ["message","model", "instance", "method", "changed_data"],
 }

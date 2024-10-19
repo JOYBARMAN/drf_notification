@@ -40,7 +40,7 @@ def create_notification(
         notification_data = create_notification_json(
             message=notification["message"],
             method=notification["method"],
-            model=model_data,
+            instance=model_data,
             serializer=serializer,
         )
 
