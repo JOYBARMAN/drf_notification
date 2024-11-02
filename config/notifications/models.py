@@ -3,7 +3,6 @@ import uuid
 from django.db import transaction
 from django.db import models
 from django.contrib.auth import get_user_model
-from django_currentuser.db.models import CurrentUserField
 from django.db.models.query import QuerySet
 from django.db.models import Count, When, Case
 
@@ -67,7 +66,13 @@ class Notification(BaseModel):
         help_text="Additional custom information related to the notification.",
     )
     # The user who created this notification.
-    created_by = CurrentUserField(help_text="The user who created this notification.")
+    created_by = models.ForeignKey(
+        User,
+        on_delete=models.CASCADE,
+        db_index=True,
+        related_name="user_notification_created_by",
+        help_text="The user who created this notification.",
+    )
     # Status of the notification (e.g., active, archived, deleted).
     status = models.CharField(
         max_length=20,
@@ -145,7 +150,7 @@ class Notification(BaseModel):
         else:
             raise ValueError("Notifications are not enabled for the current user.")
 
-    def get_current_user_unread_notifications(self):
+    def get_current_user_unread_notifications(self, user):
         """
         Retrieve unread notifications of current user.
 
@@ -154,11 +159,11 @@ class Notification(BaseModel):
         """
         return (
             Notification()
-            .get_current_user_notifications()["notifications"]
+            .get_current_user_notifications(user=user)["notifications"]
             .filter(is_read=False)
         )
 
-    def get_current_user_read_notifications(self):
+    def get_current_user_read_notifications(self, user):
         """
         Retrieve read notifications of current user.
 
@@ -167,12 +172,12 @@ class Notification(BaseModel):
         """
         return (
             Notification()
-            .get_current_user_notifications()["notifications"]
+            .get_current_user_notifications(user=user)["notifications"]
             .filter(is_read=True)
         )
 
     def create_notification_for_users(
-        self, notification_data: dict, users: QuerySet, **kwargs
+        self, notification_data: dict, users: QuerySet, requested_user, **kwargs
     ):
         """Create notifications for multiple users efficiently."""
         from notifications.utils import validate_notification
@@ -186,7 +191,12 @@ class Notification(BaseModel):
 
         # Create notification instances for each user
         notification_instance = [
-            Notification(user=user, notification=notification_data, **kwargs)
+            Notification(
+                user=user,
+                notification=notification_data,
+                created_by=requested_user,
+                **kwargs,
+            )
             for user in users
         ]
         for notification in notification_instance:
@@ -196,7 +206,8 @@ class Notification(BaseModel):
 
 
 class NotificationSettings(BaseModel):
-    """ Model to store user notification settings."""
+    """Model to store user notification settings."""
+
     user = models.OneToOneField(
         User,
         on_delete=models.CASCADE,
@@ -221,7 +232,7 @@ class NotificationSettings(BaseModel):
         return f"{self.user.username} - Notifications Enabled: {self.is_enable_notification}"
 
     def is_user_enable_notification(self, user):
-        """ Check if notifications are enabled for the user """
+        """Check if notifications are enabled for the user"""
         try:
             return self.__class__.objects.get(user=user).is_enable_notification
         except self.__class__.DoesNotExist:
