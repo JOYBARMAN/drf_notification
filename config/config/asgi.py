@@ -3,7 +3,7 @@ import os
 from django.core.asgi import get_asgi_application
 
 from notifications.routing import websocket_urlpatterns
-from notifications.jwt_middleware import JWTAuthMiddleware
+from notifications.middleware.jwt_middleware import JWTAuthMiddleware
 
 from channels.routing import ProtocolTypeRouter, URLRouter
 
