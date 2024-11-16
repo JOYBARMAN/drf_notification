@@ -1,6 +1,4 @@
-import logging
-import jsonschema
-import json
+import logging, json, jsonschema, threading
 
 from django.conf import settings
 from django.contrib.auth import get_user_model
@@ -20,10 +18,15 @@ from notifications.serializers import UserNotificationListWithCountSerializer
 from channels.db import database_sync_to_async
 from asgiref.sync import async_to_sync
 
-
+# Get the user model
 User = get_user_model()
+# Get the logger
 logger = logging.getLogger(__name__)
+# Create a thread local object to store the user
+_thread_locals = threading.local()
+# Get the settings
 ALLOWED_NOTIFICATION_DATA = getattr(settings, "ALLOWED_NOTIFICATION_DATA", False)
+# Get the cache timeout
 CACHE_TIMEOUT = getattr(settings, "CACHE_TIMEOUT", 60 * 60)
 
 
@@ -317,3 +320,13 @@ def set_user_notifications_in_cache(user, query_params, page_number, queryset):
     cache.set(user.id, user_cache, CACHE_TIMEOUT)
 
     return
+
+
+def get_current_user():
+    """Get the current user from the thread local"""
+    return getattr(_thread_locals, "user", None)
+
+
+def set_current_user(user):
+    """Set the current user in the thread local"""
+    _thread_locals.user = user

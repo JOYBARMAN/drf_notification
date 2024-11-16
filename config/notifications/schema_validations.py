@@ -6,7 +6,7 @@ NOTIFICATION_SCHEMA = {
         "instance": {"type": "object"},
         "method": {
             "type": "string",
-            "enum": ["POST", "PATCH", "GET", "DELETE", "UPDATE", "UNDEFINED"],
+            "enum": ["POST", "PATCH", "GET", "DELETE", "PUT", "UNDEFINED"],
         },
         "changed_data": {"type": "object"},
     },

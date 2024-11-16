@@ -68,7 +68,8 @@ class Notification(BaseModel):
     # The user who created this notification.
     created_by = models.ForeignKey(
         User,
-        on_delete=models.CASCADE,
+        on_delete=models.SET_NULL,
+        null=True,
         db_index=True,
         related_name="user_notification_created_by",
         help_text="The user who created this notification.",
@@ -125,6 +126,9 @@ class Notification(BaseModel):
         Raises:
             ValueError: If notifications are not enabled for the current user.
         """
+
+        if not user:
+            raise ValueError("User is missing.")
 
         if NotificationSettings().is_user_enable_notification(user=user):
             user_notifications = (
