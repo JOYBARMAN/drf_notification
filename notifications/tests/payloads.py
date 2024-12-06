@@ -19,7 +19,7 @@ def notification_message_payload(total: int):
 
     notification_payload = []
 
-    method = ["POST", "PATCH", "GET", "DELETE", "UPDATE", "UNDEFINED"]
+    method = ["POST", "PATCH", "GET", "DELETE", "PUT", "UNDEFINED"]
     for i in range(total):
         notification_payload.append(
             {
