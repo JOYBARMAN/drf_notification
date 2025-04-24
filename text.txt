@@ -1,0 +1,3 @@
+channels[daphne]
+jsonschema
+channels-redis

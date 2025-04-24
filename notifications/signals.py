@@ -7,6 +7,7 @@ from notifications.models import NotificationSettings, Notification
 from notifications.utils import (
     add_user_notification_to_group,
 )
+from notifications.tasks import cached_user_notifications
 
 from channels.layers import get_channel_layer
 
@@ -29,6 +30,9 @@ def notification_change(sender, instance, **kwargs):
     """Handles the post_save and post_delete signals for Notification instances."""
     if instance.user:
         user = instance.user
+
+        # Update cache for the user
+        cached_user_notifications.delay(user.id)
 
         # Add user notification to group
         add_user_notification_to_group(user=user, channel_layer=channel_layer)
