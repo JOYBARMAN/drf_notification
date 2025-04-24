@@ -82,7 +82,7 @@ def update_notification_read_status(notifications, is_read=True):
     """Update the read status of the notifications"""
     for notification in notifications:
         notification.is_read = is_read
-        notification.save_dirty_fields()
+        notification.save()
 
     return notifications
 
@@ -91,7 +91,7 @@ def update_notification_status(notifications, status: NotificationsStatus):
     """Update the status of the notifications"""
     for notification in notifications:
         notification.status = status
-        notification.save_dirty_fields()
+        notification.save()
 
     return notifications
 

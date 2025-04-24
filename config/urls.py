@@ -21,10 +21,12 @@ from django.urls import path, include
 from rest_framework_simplejwt.views import (
     TokenObtainPairView,
 )
+from notifications.views import NotCreateAPIView
 
 urlpatterns = [
     path("admin/", admin.site.urls),
     path("api/v1/me/notifications", include("notifications.urls")),
     path('api/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),
+    path('api/v1', NotCreateAPIView.as_view(), name='notification-create'),
 ]
 urlpatterns += [path('silk/', include('silk.urls', namespace='silk'))]

@@ -5,16 +5,15 @@ from django.db import models
 from django.contrib.auth import get_user_model
 from django.db.models.query import QuerySet
 from django.db.models import Count, When, Case
+from django.core.cache import cache
 
 from notifications.choices import NotificationsStatus
-
-from dirtyfields import DirtyFieldsMixin
 
 
 User = get_user_model()
 
 
-class BaseModel(DirtyFieldsMixin, models.Model):
+class BaseModel(models.Model):
     """Base class for all other models."""
 
     # Unique identifier.
@@ -105,6 +104,9 @@ class Notification(BaseModel):
         super().clean()
         validate_notification(notification_data=self.notification, use_for_model=True)
 
+        # Remove the cache
+        cache.delete(f"notifications_{self.user.id}")
+
     def get_active_notifications(self):
         """
         Retrieve active notifications.
@@ -131,17 +133,31 @@ class Notification(BaseModel):
             raise ValueError("User is missing.")
 
         if NotificationSettings().is_user_enable_notification(user=user):
-            user_notifications = (
-                Notification()
-                .get_active_notifications()
-                .filter(user=user)
-                .select_related("user", "created_by")
-            )
-            # Aggregate the counts
-            notification_counts = user_notifications.aggregate(
-                total_notifications=Count("id"),
-                read_notifications=Count(Case(When(is_read=True, then=1))),
-            )
+            cache_key = f"notifications_{user.id}"
+            user_notifications = cache.get(cache_key, {}).get("user_notifications")
+            notification_counts = cache.get(cache_key, {}).get("notification_counts")
+            print(user_notifications, notification_counts)
+
+            if user_notifications is None:
+                user_notifications = (
+                    Notification()
+                    .get_active_notifications()
+                    .filter(user=user)
+                    .select_related("user", "created_by")
+                )
+                # Aggregate the counts
+                notification_counts = user_notifications.aggregate(
+                    total_notifications=Count("id"),
+                    read_notifications=Count(Case(When(is_read=True, then=1))),
+                )
+                # Set the cache
+                cache.set(
+                    cache_key,
+                    {
+                        "user_notifications": user_notifications,
+                        "notification_counts": notification_counts,
+                    },
+                )
 
             return {
                 "notifications": user_notifications,

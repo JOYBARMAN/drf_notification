@@ -99,9 +99,57 @@ class UserNotificationDetail(generics.RetrieveUpdateAPIView):
             # Update unread notification
             if not notification.is_read:
                 notification.is_read = True
-                notification.save_dirty_fields()
+                notification.save()
 
             return notification
 
         except ValueError as e:
             raise ValidationError({"detail": str(e)})
+
+
+
+
+# Create your views here.
+from rest_framework import generics
+from rest_framework.views import APIView
+from django.contrib.auth import get_user_model
+from notifications.service import NotificationService
+from notifications.utils import create_notification_json, get_changed_fields
+from rest_framework.permissions import IsAuthenticated
+from rest_framework.response import Response
+from notifications.models import Notification
+from django.db.models import QuerySet
+from django.db.models.signals import post_save
+from notifications.tasks import call_signal
+
+User = get_user_model()
+
+
+class NotCreateAPIView(APIView):
+    """Create notification"""
+
+    permission_classes = [IsAuthenticated]
+
+    def post(self, request):
+        self.user_list = User.objects.filter()
+        notification_json = create_notification_json(
+            message="Hello, World!",
+            instance=request.user,
+            method="POST",
+            serializer=None,
+            changed_data={},
+        )
+        notifications=Notification.objects.bulk_create(
+            [
+                Notification(
+                    user=user,
+                    notification=notification_json,
+                    created_by=request.user,
+                )
+                for user in self.user_list
+            ]
+        )
+
+        call_signal.apply_async(kwargs={"notification_ids": [instance.id for instance in notifications]})
+
+        return Response({"message": "Notification created successfully."}, status=201)
