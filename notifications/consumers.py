@@ -55,11 +55,21 @@ class NotificationConsumer(AsyncWebsocketConsumer):
 
     async def receive(self, text_data=None):
         user = self.scope.get("user")
+        # Extract the page and page_size from the received message
+        data = json.loads(text_data or "{}")
+        page = data.get("page", 1)
+        page_size = data.get("page_size", 25)
+        is_read = data.get("is_read", "")
 
         try:
             # Get the user's notifications
-            notifications = await database_sync_to_async(get_user_serialized_notifications)(
-                user=user
+            notifications = await database_sync_to_async(
+                get_user_serialized_notifications
+            )(
+                user=user,
+                is_read=is_read,
+                page=page,
+                page_size=page_size,
             )
         except ValueError as e:
             # Handle the error when user not enabled the notification settings

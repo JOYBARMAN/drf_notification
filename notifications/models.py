@@ -6,15 +6,14 @@ from django.contrib.auth import get_user_model
 from django.db.models.query import QuerySet
 from django.db.models import Count, When, Case
 
+from notifications.managers import SignalTriggeringManager
 from notifications.choices import NotificationsStatus
-
-from dirtyfields import DirtyFieldsMixin
 
 
 User = get_user_model()
 
 
-class BaseModel(DirtyFieldsMixin, models.Model):
+class BaseModel(models.Model):
     """Base class for all other models."""
 
     # Unique identifier.
@@ -86,6 +85,9 @@ class Notification(BaseModel):
     class Meta:
         verbose_name = "Notification"
         verbose_name_plural = "Notifications"
+
+    # Custom manager for the Notification model.
+    objects = SignalTriggeringManager()
 
     def __str__(self):
         """
@@ -203,8 +205,8 @@ class Notification(BaseModel):
             )
             for user in users
         ]
-        for notification in notification_instance:
-            notification.save()
+        # Use bulk_create to insert all instances in a single query
+        Notification.objects.bulk_create(notification_instance)
 
         return
 

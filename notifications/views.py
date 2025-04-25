@@ -99,7 +99,7 @@ class UserNotificationDetail(generics.RetrieveUpdateAPIView):
             # Update unread notification
             if not notification.is_read:
                 notification.is_read = True
-                notification.save_dirty_fields()
+                notification.save()
 
             return notification
 
