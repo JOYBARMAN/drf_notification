@@ -10,6 +10,12 @@ For the full list of settings and their values, see
 https://docs.djangoproject.com/en/5.0/ref/settings/
 """
 
+# import os
+# import django
+
+# os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings")
+# django.setup()
+
 from pathlib import Path
 from datetime import timedelta
 
@@ -43,6 +49,7 @@ LOCAL_APPS = ["notifications.apps.NotificationsConfig"]
 THIRD_PARTY_APPS = [
     "rest_framework",
     "rest_framework_simplejwt",
+    "corsheaders",
     "silk",
 ]
 
@@ -51,6 +58,7 @@ INSTALLED_APPS = CHANNELS_APPS + DEFAULT_APPS + LOCAL_APPS + THIRD_PARTY_APPS
 MIDDLEWARE = [
     "django.middleware.security.SecurityMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
+    "corsheaders.middleware.CorsMiddleware",
     "django.middleware.common.CommonMiddleware",
     "django.middleware.csrf.CsrfViewMiddleware",
     "django.contrib.auth.middleware.AuthenticationMiddleware",
@@ -158,6 +166,8 @@ SIMPLE_JWT = {
 }
 
 # Settings for if notifications instance want to use the websocket
-ALLOWED_NOTIFICATION_DATA = False
+ALLOWED_NOTIFICATION_DATA = True
 # Settings for defined user serializer
 NOTIFICATION_USER_SERIALIZER = 'notifications.serializers.CustomUserSerializer'
+
+CORS_ALLOW_ALL_ORIGINS = True

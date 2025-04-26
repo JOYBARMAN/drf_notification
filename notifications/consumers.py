@@ -20,12 +20,17 @@ logger = logging.getLogger(__name__)
 class NotificationConsumer(AsyncWebsocketConsumer):
 
     async def connect(self):
-        # Accept connection
-        await self.accept()
+        error = self.scope.get("error")
+        # Get the subprotocols from the scope
+        subprotocols = self.scope.get("subprotocols")
+        if subprotocols:
+            await self.accept(subprotocol=subprotocols)
+        else:
+            await self.accept()
 
+        # If token is invalid or missing
         if self.is_error_exists():
-            error = {"error": str(self.scope["error"])}
-            await self.send(text_data=json.dumps(error))
+            await self.send(text_data=json.dumps({"error": error}))
             await self.close()
             return
 
@@ -55,11 +60,21 @@ class NotificationConsumer(AsyncWebsocketConsumer):
 
     async def receive(self, text_data=None):
         user = self.scope.get("user")
+        # Extract the page and page_size from the received message
+        data = json.loads(text_data or "{}")
+        page = data.get("page", 1)
+        page_size = data.get("page_size", 25)
+        is_read = data.get("is_read", "")
 
         try:
             # Get the user's notifications
-            notifications = await database_sync_to_async(get_user_serialized_notifications)(
-                user=user
+            notifications = await database_sync_to_async(
+                get_user_serialized_notifications
+            )(
+                user=user,
+                is_read=is_read,
+                page=page,
+                page_size=page_size,
             )
         except ValueError as e:
             # Handle the error when user not enabled the notification settings

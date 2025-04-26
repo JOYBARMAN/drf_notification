@@ -3,8 +3,9 @@ import logging, json, jsonschema, threading
 from django.conf import settings
 from django.contrib.auth import get_user_model
 from django.core import serializers
-from django.db.models.query import QuerySet
 from django.core.cache import cache
+from django.core.paginator import Paginator, EmptyPage
+from django.db.models.query import QuerySet
 from django.forms.models import model_to_dict
 
 from rest_framework_simplejwt.tokens import AccessToken
@@ -18,6 +19,7 @@ from notifications.serializers import UserNotificationListWithCountSerializer
 from channels.db import database_sync_to_async
 from asgiref.sync import async_to_sync
 
+
 # Get the user model
 User = get_user_model()
 # Get the logger
@@ -25,7 +27,7 @@ logger = logging.getLogger(__name__)
 # Create a thread local object to store the user
 _thread_locals = threading.local()
 # Get the settings
-ALLOWED_NOTIFICATION_DATA = getattr(settings, "ALLOWED_NOTIFICATION_DATA", False)
+ALLOWED_NOTIFICATION_DATA = getattr(settings, "ALLOWED_NOTIFICATION_DATA", True)
 # Get the cache timeout
 CACHE_TIMEOUT = getattr(settings, "CACHE_TIMEOUT", 60 * 60)
 
@@ -60,40 +62,64 @@ def serialized_notifications(notifications):
     return UserNotificationListWithCountSerializer(notifications).data
 
 
-def get_user_serialized_notifications(user):
-    """Get notifications for the user and return serialized data"""
+def get_user_serialized_notifications(user, is_read: str = "", page=1, page_size=25):
+    """Get notifications for the user and return serialized data with pagination"""
+    # Modify is _read to boolean
+    acceptable_value = {"true": True, "false": False}
+    if is_read:
+        is_read = acceptable_value.get(is_read.lower())
+
+    # Retrieve notifications from the database
     try:
-        notifications = Notification().get_current_user_notifications(user=user)
+        queryset = Notification().get_current_user_notifications(user=user)
+        notifications = queryset["notifications"].all()
     except ValueError as e:
         return {"error": str(e)}
 
-    serialized_notification = serialized_notifications(notifications)
+    # If valid query params found then filter
+    if isinstance(is_read, bool):
+        notifications = notifications.filter(is_read=is_read)
 
-    # Check is the user want to get the notification data in websocket response
-    # If ALLOWED_NOTIFICATION_DATA=True in settings.py we show the notification data in websocket response
-    if not ALLOWED_NOTIFICATION_DATA:
-        serialized_notification.pop("notifications")
-        return serialized_notification
+    # Paginate the notifications list
+    paginator = Paginator(notifications, page_size)
 
-    return serialized_notification
+    try:
+        page_obj = paginator.page(page)
+    except EmptyPage:
+        page_obj = paginator.page(paginator.num_pages)
+
+    # Add pagination data to the response
+    queryset["notifications"] = page_obj.object_list
+
+    serialized_notification = serialized_notifications(queryset)
+
+    return {
+        "results": serialized_notification,
+        "pagination": {
+            "page": page_obj.number,
+            "page_size": page_size,
+            "total_pages": paginator.num_pages,
+            "total_items": paginator.count,
+        },
+    }
 
 
 def update_notification_read_status(notifications, is_read=True):
     """Update the read status of the notifications"""
     for notification in notifications:
         notification.is_read = is_read
-        notification.save_dirty_fields()
 
-    return notifications
+    # Update using bulk update
+    return Notification.objects.bulk_update(notifications, ["is_read"])
 
 
 def update_notification_status(notifications, status: NotificationsStatus):
     """Update the status of the notifications"""
     for notification in notifications:
         notification.status = status
-        notification.save_dirty_fields()
 
-    return notifications
+    # Update using bulk update
+    return Notification.objects.bulk_update(notifications, ["status"])
 
 
 def validate_notification(notification_data: dict, use_for_model=False):
@@ -275,11 +301,11 @@ def get_token_from_scope(scope):
     headers = dict(scope.get("headers", {}))
 
     # Extract the authorizations header
-    authorizations = headers.get(b"authorizations")
+    authorization = headers.get(b"authorization")
 
-    if authorizations:
+    if authorization:
         # Decode the bytes to a string
-        decoded_auth = authorizations.decode("utf-8")
+        decoded_auth = authorization.decode("utf-8")
         # Split the string and check if it contains at least two parts
         parts = decoded_auth.split(" ")
         if len(parts) == 2 and parts[0] == "Bearer":
