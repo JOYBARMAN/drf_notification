@@ -6,8 +6,12 @@ from channels.middleware import BaseMiddleware
 class JWTAuthMiddleware(BaseMiddleware):
 
     async def __call__(self, scope, receive, send):
-        # Get the token from the scope headers
-        token = get_token_from_scope(scope)
+        token = None
+        # Get token from subprotocol
+        subprotocols = scope.get("subprotocols", [])
+        if subprotocols:
+            token = subprotocols[0]
+            scope["subprotocols"] = subprotocols[0]
 
         if token:
             # Validate the token
@@ -22,6 +26,6 @@ class JWTAuthMiddleware(BaseMiddleware):
 
         else:
             # If no token is provided in the headers, set an error message
-            scope["error"] = "Provide an access token in the headers."
+            scope["error"] = "Provide an access token in the subprotocols"
 
         return await super().__call__(scope, receive, send)

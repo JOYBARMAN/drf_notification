@@ -20,12 +20,17 @@ logger = logging.getLogger(__name__)
 class NotificationConsumer(AsyncWebsocketConsumer):
 
     async def connect(self):
-        # Accept connection
-        await self.accept()
+        error = self.scope.get("error")
+        # Get the subprotocols from the scope
+        subprotocols = self.scope.get("subprotocols")
+        if subprotocols:
+            await self.accept(subprotocol=subprotocols)
+        else:
+            await self.accept()
 
+        # If token is invalid or missing
         if self.is_error_exists():
-            error = {"error": str(self.scope["error"])}
-            await self.send(text_data=json.dumps(error))
+            await self.send(text_data=json.dumps({"error": error}))
             await self.close()
             return
 
