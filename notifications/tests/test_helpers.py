@@ -4,7 +4,7 @@ from django.db.models.query import QuerySet
 from rest_framework_simplejwt.tokens import RefreshToken
 
 from notifications.models import Notification
-from notifications.utils import create_notification_json
+from notifications.utils.notifications import create_notification_json
 
 from channels.db import database_sync_to_async
 

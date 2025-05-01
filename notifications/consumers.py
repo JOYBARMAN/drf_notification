@@ -1,13 +1,9 @@
-import json
-import logging
+import json, logging
 
 from django.contrib.auth import get_user_model
 
-from notifications.utils import (
-    get_user_serialized_notifications,
-    get_user,
-    get_group_name,
-)
+from notifications.utils.notifications import get_user_serialized_notifications
+from notifications.utils.consumers import get_user, get_group_name
 
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
@@ -20,7 +16,6 @@ logger = logging.getLogger(__name__)
 class NotificationConsumer(AsyncWebsocketConsumer):
 
     async def connect(self):
-        error = self.scope.get("error")
         # Get the subprotocols from the scope
         subprotocols = self.scope.get("subprotocols")
         if subprotocols:
@@ -30,6 +25,7 @@ class NotificationConsumer(AsyncWebsocketConsumer):
 
         # If token is invalid or missing
         if self.is_error_exists():
+            error = self.scope.get("error")
             await self.send(text_data=json.dumps({"error": error}))
             await self.close()
             return
@@ -98,8 +94,7 @@ class NotificationConsumer(AsyncWebsocketConsumer):
         # Update the user's notifications when any change occurs in the Notification model
         user = self.scope.get("user")
         if user:
-            notifications = event["user_notifications"]
-            await self.send(text_data=json.dumps(notifications))
+            await self.receive()
 
     def is_error_exists(self):
         # Checks if error exists during websockets

@@ -6,7 +6,7 @@ from django.contrib.auth import get_user_model
 from django.core.cache import cache
 
 from notifications.models import NotificationSettings, Notification
-from notifications.utils import (
+from notifications.utils.consumers import (
     add_user_notification_to_group,
 )
 from notifications.managers import bulk_post_save

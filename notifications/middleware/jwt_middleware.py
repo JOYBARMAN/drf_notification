@@ -1,4 +1,4 @@
-from notifications.utils import validate_token, get_token_from_scope
+from notifications.utils.consumers import validate_token, get_token_from_scope
 
 from channels.middleware import BaseMiddleware
 
