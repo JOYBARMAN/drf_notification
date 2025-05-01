@@ -10,7 +10,7 @@ from notifications.serializers import (
     NotificationSerializer,
 )
 from notifications.paginations import CustomPagination
-from notifications.utils import (
+from notifications.utils.cache import (
     get_user_cache_notifications,
     set_user_notifications_in_cache,
 )

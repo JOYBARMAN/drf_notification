@@ -1,6 +1,5 @@
 import uuid
 
-from django.db import transaction
 from django.db import models
 from django.contrib.auth import get_user_model
 from django.db.models.query import QuerySet
@@ -102,7 +101,7 @@ class Notification(BaseModel):
         """
         Perform this action before saving the model instance.
         """
-        from notifications.utils import validate_notification
+        from notifications.utils.notifications import validate_notification
 
         super().clean()
         validate_notification(notification_data=self.notification, use_for_model=True)
@@ -186,7 +185,7 @@ class Notification(BaseModel):
         self, notification_data: dict, users: QuerySet, requested_user, **kwargs
     ):
         """Create notifications for multiple users efficiently."""
-        from notifications.utils import validate_notification
+        from notifications.utils.notifications import validate_notification
 
         # Validate notification data
         validate_notification(notification_data=notification_data)

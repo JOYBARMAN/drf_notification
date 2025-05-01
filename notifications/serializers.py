@@ -93,7 +93,7 @@ class UserNotificationListWithCountSerializer(serializers.Serializer):
         return attrs
 
     def update(self, instance, validated_data):
-        from notifications.utils import (
+        from notifications.utils.notifications import (
             update_notification_read_status,
             update_notification_status,
         )

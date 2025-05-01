@@ -1,10 +1,10 @@
 from django.db.models import QuerySet
 
 from notifications.models import Notification
-from notifications.utils import (
+from notifications.utils.current_user import get_current_user
+from notifications.utils.notifications import (
     create_notification_json,
     get_changed_fields,
-    get_current_user,
 )
 
 from typing import Optional, List, Dict, Union

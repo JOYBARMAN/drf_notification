@@ -1,6 +1,6 @@
 from rest_framework_simplejwt.authentication import JWTAuthentication
 
-from notifications.utils import set_current_user
+from notifications.utils.current_user import set_current_user
 
 
 class DRFCurrentUserMiddleware:
