@@ -31,12 +31,9 @@ def create_notification_settings(sender, instance, created, **kwargs):
 @receiver(post_delete, sender=Notification)
 def notification_change(sender, instance, **kwargs):
     """Handles the post_save and post_delete signals for Notification instances."""
-    if instance.user:
-        user = instance.user
-        # Add user notification to group
-        add_user_notification_to_group(user=user, channel_layer=channel_layer)
-        # Remove cache for the user
-        cache.delete(user.id)
+    bulk_post_save.send(
+        sender=Notification, instances=[instance], created=kwargs.get("created", False)
+    )
 
 
 @receiver(bulk_post_save)
