@@ -21,7 +21,7 @@ def get_user_cache_notifications(user, query_params, page_number):
     sub_key = generate_sub_key(query_params, page_number)
 
     # Try to get the cached data from the user's cache
-    if sub_key in user_cache:
+    if user_cache.get(sub_key):
         return user_cache[sub_key]
 
     return None

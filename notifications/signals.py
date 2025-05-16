@@ -42,9 +42,9 @@ def handle_bulk_post_save(sender, instances, created, **kwargs):
         for instance in instances:
             if instance.user:
                 user = instance.user
-                # Add user notification to group
-                add_user_notification_to_group(user=user, channel_layer=channel_layer)
                 # Remove cache for the user
                 cache.delete(user.id)
+                # Add user notification to group
+                add_user_notification_to_group(user=user, channel_layer=channel_layer)
 
     threading.Thread(target=background_task).start()

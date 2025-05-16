@@ -25,7 +25,7 @@ class TestNotificationWebSocketApi(base_test.BaseTest):
             ws_url,
             headers=[
                 (
-                    b"authorizations",
+                    b"authorization",
                     bearer_token.encode("utf-8"),
                 )
             ],
@@ -44,6 +44,7 @@ class TestNotificationWebSocketApi(base_test.BaseTest):
 
         # Receive a message from the WebSocket and check its content
         response = await communicator.receive_json_from()
+        response = response.get("results")
 
         self.assertIn("total_notifications", response) and self.assertEqual(
             response["total_notifications"], self.total_created_notification

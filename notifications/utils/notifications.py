@@ -1,4 +1,4 @@
-import logging, json, jsonschema
+import json, jsonschema, math
 
 from django.conf import settings
 from django.core import serializers
@@ -10,7 +10,11 @@ from django.forms.models import model_to_dict
 from rest_framework.exceptions import ValidationError
 
 from notifications.choices import NotificationsStatus
-from notifications.schema_validations import NOTIFICATION_SCHEMA
+from notifications.utils.schema_validations import NOTIFICATION_SCHEMA
+from notifications.utils.cache import (
+    set_user_notifications_in_cache,
+    get_user_cache_notifications,
+)
 from notifications.models import Notification
 from notifications.serializers import UserNotificationListWithCountSerializer
 
@@ -87,40 +91,74 @@ def get_user_serialized_notifications(user, is_read: str = "", page=1, page_size
     """Get notifications for the user and return serialized data with pagination"""
     # Modify is _read to boolean
     acceptable_value = {"true": True, "false": False}
-    if is_read:
-        is_read = acceptable_value.get(is_read.lower())
+    is_read = (
+        is_read
+        if isinstance(is_read, bool)
+        else acceptable_value.get(is_read.lower(), None)
+    )
 
-    # Retrieve notifications from the database
-    try:
-        queryset = Notification().get_current_user_notifications(user=user)
-        notifications = queryset["notifications"].all()
-    except ValueError as e:
-        return {"error": str(e)}
+    # Try to get user notifications from the cache
+    user_cached_notifications = get_user_cache_notifications(
+        user=user,
+        page_number=page,
+        query_params=is_read,
+    )
+    if user_cached_notifications:
+        queryset = user_cached_notifications
+    else:
+        # Retrieve notifications from the database
+        try:
+            queryset = Notification().get_current_user_notifications(user=user)
+            notifications = queryset["notifications"].all()
+        except ValueError as e:
+            return {"error": str(e)}
 
-    # If valid query params found then filter
-    if isinstance(is_read, bool):
-        notifications = notifications.filter(is_read=is_read)
+        # If valid query params found then filter
+        if isinstance(is_read, bool):
+            notifications = notifications.filter(is_read=is_read)
 
-    # Paginate the notifications list
-    paginator = Paginator(notifications, page_size)
+        # Paginate the notifications list
+        paginator = Paginator(notifications, page_size)
 
-    try:
-        page_obj = paginator.page(page)
-    except EmptyPage:
-        page_obj = paginator.page(paginator.num_pages)
+        try:
+            page_obj = paginator.page(page)
+        except EmptyPage:
+            queryset["notifications"] = [{"detail": "Invalid page number."}]
+            return get_paginate_response(
+                queryset=queryset,
+                page=page,
+                page_size=page_size,
+            )
 
-    # Add pagination data to the response
-    queryset["notifications"] = page_obj.object_list
+        # Add pagination data to the response
+        queryset["notifications"] = page_obj.object_list
+
+        # Update the user's cache
+        set_user_notifications_in_cache(
+            user=user,
+            page_number=page,
+            query_params=is_read,
+            queryset=queryset,
+        )
 
     serialized_notification = serialized_notifications(queryset)
 
+    return get_paginate_response(
+        queryset=serialized_notification,
+        page=page,
+        page_size=page_size,
+    )
+
+
+def get_paginate_response(queryset, page=1, page_size=25):
+    """Get paginated response for a queryset"""
     return {
-        "results": serialized_notification,
+        "results": queryset,
         "pagination": {
-            "page": page_obj.number,
+            "page": page,
             "page_size": page_size,
-            "total_pages": paginator.num_pages,
-            "total_items": paginator.count,
+            "total_pages": math.ceil(queryset["total_notifications"] / page_size),
+            "total_items": queryset["total_notifications"],
         },
     }
 

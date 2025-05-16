@@ -10,4 +10,4 @@ def get_notification_detail_url(uid: str):
 
 
 def get_notification_ws_url():
-    return f"ws/ac/me/notifications/"
+    return f"ws/me/notifications/"

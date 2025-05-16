@@ -83,25 +83,23 @@ class UserNotificationDetail(generics.RetrieveUpdateAPIView):
     serializer_class = NotificationSerializer
 
     def get_object(self):
-        try:
-            uid = self.kwargs.get("uid")
+        uid = self.kwargs.get("uid")
 
-            # Get user notification single instance
+        # Get user notification single instance
+        try:
             notification = (
                 Notification()
                 .get_current_user_notifications(user=self.request.user)["notifications"]
-                .filter(uid=uid)
-                .first()
+                .get(uid=uid)
             )
-            if not notification:
-                raise NotFound(detail="Notification not found")
-
-            # Update unread notification
-            if not notification.is_read:
-                notification.is_read = True
-                notification.save()
-
-            return notification
-
+        except Notification.DoesNotExist:
+            raise NotFound(detail="Notification not found")
         except ValueError as e:
             raise ValidationError({"detail": str(e)})
+
+        # Update unread notification
+        if not notification.is_read:
+            notification.is_read = True
+            notification.save()
+
+        return notification

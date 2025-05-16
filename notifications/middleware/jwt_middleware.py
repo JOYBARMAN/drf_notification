@@ -11,7 +11,11 @@ class JWTAuthMiddleware(BaseMiddleware):
         subprotocols = scope.get("subprotocols", [])
         if subprotocols:
             token = subprotocols[0]
-            scope["subprotocols"] = subprotocols[0]
+            scope["subprotocols"] = token
+        else:
+            # If no subprotocols are provided, check the headers
+            token = get_token_from_scope(scope)
+            scope["subprotocols"] = token
 
         if token:
             # Validate the token
