@@ -1,4 +1,4 @@
-from notifications.utils.consumers import validate_token, get_token_from_scope
+from notifications.utils.consumers import validate_token
 
 from channels.middleware import BaseMiddleware
 
@@ -6,15 +6,12 @@ from channels.middleware import BaseMiddleware
 class JWTAuthMiddleware(BaseMiddleware):
 
     async def __call__(self, scope, receive, send):
+        """Middleware to authenticate WebSocket connections using JWT tokens."""
         token = None
         # Get token from subprotocol
         subprotocols = scope.get("subprotocols", [])
         if subprotocols:
             token = subprotocols[0]
-            scope["subprotocols"] = token
-        else:
-            # If no subprotocols are provided, check the headers
-            token = get_token_from_scope(scope)
             scope["subprotocols"] = token
 
         if token:
